@@ -1,0 +1,252 @@
+{
+	"info": {
+		"_postman_id": "52cbef13-fca3-40d0-8d2a-41e2110be424",
+		"name": "CYANASE INVESTORS",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "8084036",
+		"_collection_link": "https://binariqueltd.postman.co/workspace/CyanaseTeamWorkspace~86e4e2cf-9b77-42a2-8e89-ab61a1bc7d8c/collection/8084036-52cbef13-fca3-40d0-8d2a-41e2110be424?action=share&creator=8084036&source=collection_link"
+	},
+	"item": [
+		{
+			"name": "USERS",
+			"item": [
+				{
+					"name": "CREATE AUTH USER TOKEN",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "username",
+									"value": "admin",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "admin@cyanase2023",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "http://127.0.0.1:8000/api/v1/en/auth/token/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"v1",
+								"en",
+								"auth",
+								"token",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GET ALL USERS",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token ca892323d9b924c7bc0000185a3300dda7235783",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "http://127.0.0.1:8000/api/v1/en/auth/users/all/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"v1",
+								"en",
+								"auth",
+								"users",
+								"all",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GET AUTH USER",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token ca892323d9b924c7bc0000185a3300dda7235783",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "http://127.0.0.1:8000/api/v1/en/auth/user/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"v1",
+								"en",
+								"auth",
+								"user",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GET AUTH USER BY ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token ca892323d9b924c7bc0000185a3300dda7235783",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "http://127.0.0.1:8000/api/v1/en/auth/user/1/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"v1",
+								"en",
+								"auth",
+								"user",
+								"1",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "CREATE AUTH USER",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"username\": \"oneminute256\", \r\n    \"email\": \"oneminuteproduction256@gmail.com\",\r\n    \"first_name\": \"One\",\r\n    \"last_name\": \"Minute\",\r\n    \"password\": \"12345678\",\r\n    \"confirmpassword\": \"12345678\",\r\n    \"pkg_id\": 1,\r\n    \"profile\": {\r\n        \"gender\": \"Male\",\r\n        \"birth_date\": \"1997-06-19\",\r\n        \"phone_no\": \"\",\r\n        \"country\": \"\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:8000/api/v1/en/auth/user/login",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"v1",
+								"en",
+								"auth",
+								"user",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "LOGIN AUTH USER",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"username\": \"admin\",\r\n    \"password\": \"admin@cyanase2023\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:8000/api/v1/en/auth/user/login/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"api",
+								"v1",
+								"en",
+								"auth",
+								"user",
+								"login",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "LOCALE",
+			"item": []
+		},
+		{
+			"name": "PAYMENTS",
+			"item": []
+		},
+		{
+			"name": "DEPOSITS",
+			"item": []
+		},
+		{
+			"name": "WITHDARWS",
+			"item": []
+		},
+		{
+			"name": "INVESTMENTS",
+			"item": []
+		}
+	]
+}
