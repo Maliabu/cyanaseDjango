@@ -1,13 +1,14 @@
 import datetime
 from .models import *
-from .helper import helper
+from .helper.helper import Helper
 from .v1.locale import Locale
 from django.contrib.auth.models import User
 
 
+_helper = Helper()
 class Deposits:
     def __init__(self):
-        self.help = helper.Helper()
+        self.help = Helper()
 
     def getDeopsitById(self, request,lang, depositid):
         if Deposit.objects.filter(pk=depositid).exists():
@@ -17,6 +18,7 @@ class Deposits:
                 "deposit_category": ddeposit.deposit_category,
                 "deposit_amount": ddeposit.deposit_amount,
                 "currency": ddeposit.currency,
+                "investment_option":ddeposit.investment_option,
                 "account_type": ddeposit.account_type.pk,
                 "created": ddeposit.created,
             }
@@ -41,6 +43,7 @@ class Deposits:
                         "currency":deposit.currency,
                         "deposit_category":deposit.deposit_category,
                         "payment_means":deposit.payment_means,
+                        "investment_option":deposit.investment_option,
                         "account_type":deposit.account_type.code_name
                     })
             return totalDeposit,getDeposits
@@ -51,9 +54,12 @@ class Deposits:
     
     def getAllDeposits(self,request,lang,user):
         deposits = []
+        options = []
+        dates = []
         totalDepositAmount = 0
         totalUGX = 0
         totalUSD = 0
+        depo = []
         totalDepositUGX = 0
         totalDepositUSD = 0
         userid = request.user.id
@@ -62,7 +68,7 @@ class Deposits:
             if deposit.user.id == userid:
                 amount = deposit.deposit_amount
                 currency = deposit.currency
-                if currency == "UGX":
+                if currency != "USD":
                     totalUGX += amount
                 else:
                     totalUSD += amount
@@ -75,21 +81,31 @@ class Deposits:
                 "payment_means": deposit.payment_means,
                 "deposit_category": deposit.deposit_category,
                 "deposit_amount": deposit.deposit_amount,
+                "investment_option":deposit.investment_option,
                 "currency": deposit.currency,
                 "account_type": deposit.account_type.pk,
-                "created": deposit.created,
+                "created": deposit.created.strftime("%d %b"),
             })
+            options.append(deposit.investment_option)
         goalDepositsUGX = Goals.getAllUserGoals(self,request,lang,user)[0]
         goalDepositUSD = Goals.getAllUserGoals(self,request,lang,user)[1]
         
         totalDepositUGX = totalUGX - goalDepositsUGX
         totalDepositUSD = totalUSD - goalDepositUSD
-        return totalDepositUGX,totalDepositUSD,totalUGX,totalUSD,deposits
+        option = set(options)
+        for item in option:
+            aamount = Deposit.objects.filter(investment_option=item)
+            for amount in aamount:
+                depo.append({"name":item, "datas":amount.deposit_amount/1000,"date":amount.created.strftime("%d %b")})
+                dates.append(amount.created.strftime("%d %b"))
+        # myData = list({names["name"]:names for names in depo}.values())
+        return totalDepositUGX,totalDepositUSD,totalUGX,totalUSD,depo,dates,deposits,goalDepositsUGX
     
     def depositToGoal(self,request,lang,user,goalid):
         current_datetime = datetime.datetime.now()
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
+        investment_option = request.data["investment_option"]
         deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
         account_type = request.data["account_type"]
@@ -102,7 +118,7 @@ class Deposits:
         # print(userid)
         # # create deposit
         account_type = AccountType.objects.filter(code_name=account_type).get()
-        if is_verified is True:
+        if is_verified is False:
         # # create deposit
             deposit = Deposit.objects.create(
                 deposit_amount=float(request.data["deposit_amount"]),
@@ -110,6 +126,7 @@ class Deposits:
                 user=User(pk=int(userid)),
                 goal=Goal(pk=int(goalid)),
                 deposit_category=deposit_category,
+                investment_option = investment_option,
                 currency=currency,
                 account_type=account_type
             )
@@ -144,6 +161,7 @@ class Deposits:
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
         deposit_amount = request.data["deposit_amount"]
+        investment_option = request.data["investment_option"]
         currency = request.data["currency"]
         account_type = request.data["account_type"]
         # get the user from Authorised user in token
@@ -154,12 +172,14 @@ class Deposits:
         # print(userid)
         # # create deposit
         account_type = AccountType.objects.filter(code_name=account_type).get()
-        if is_verified is True:
+        # check if a user is verified to deposit
+        if is_verified is False:
             deposit = Deposit.objects.create(
                 deposit_amount=float(request.data["deposit_amount"]),
                 payment_means=request.data["payment_means"],
                 user=User(pk=int(userid)),
                 deposit_category=deposit_category,
+                investment_option=investment_option,
                 currency=currency,
                 account_type=account_type
             )
@@ -185,7 +205,7 @@ class Deposits:
 
 class Goals:
     def __init__(self):
-        self.help = helper.Helper()
+        self.help = Helper()
         
     def createGoal(self, request,lang,user):
         current_datetime = datetime.datetime.now()
@@ -261,7 +281,7 @@ class Goals:
         
 class NextOfKins:
     def __init__(self):
-        self.help = helper.Helper()
+        self.help = Helper()
         
     def addNextOfKin(self,request,lang,user):
         current_datetime = datetime.datetime.now()
@@ -379,7 +399,7 @@ class NextOfKins:
 
 class RiskProfiles:
     def __init__(self):
-        self.help = helper.Helper()
+        self.help = Helper()
         
     def addRiskProfile(self,request,lang,user):
         userid = request.user.id
@@ -476,4 +496,231 @@ class RiskProfiles:
         }
         
         
+class Withdraws:
+    def __init__(self):
+        self.help = Helper()
         
+    def withdrawFromBank(self,request,lang,user,transactionid):
+        withdraw_channel = request.data["withdraw_channel"]
+        withdraw_amount = request.data["withdraw_amount"]
+        userid = request.user.id
+        currency = request.data["currency"]
+        account_type = request.data["account_type"]
+        created = datetime.datetime.now()
+        is_verified = request.user.userprofile.is_verified
+        account_type = AccountType.objects.filter(code_name=account_type).get()
+        status = "pending"
+        ## remember to verify the user
+        if is_verified is False:
+            withdraw = Withdraw.objects.create(
+                withdraw_channel=withdraw_channel,
+                withdraw_amount=withdraw_amount,
+                currency=currency,
+                account_type=account_type,
+                user=User(pk=int(userid)),
+                transaction=BankTransaction(pk=int(transactionid)),
+                status=status
+            )
+            withdrawid = withdraw.id
+            withdraw.save()
+            wwithdraw = self.getWithdrawById(request,lang,withdrawid)
+            return{
+               "message": f"You have successfully withdrawn {currency} {withdraw_amount} from your {account_type} account",
+                "success": True,
+                "user_id":userid,
+                "withdraw_id": withdrawid,
+                "withdraw": wwithdraw,
+                "time withdraw was created": created,
+                "transaction":transactionid
+            }
+        else:
+            return{
+                "message": "your account is not verified, please check your email and verify",
+                "success": False
+            }
+        
+    def getAllWithdraws(self,request,lang,user):
+        wwithdraws = []
+        userid = request.user.id
+        withdraws = Withdraw.objects.filter(user_id=userid)
+        if withdraws.exists:
+            for withdraw in withdraws:
+                withdrawid = withdraw.pk
+                wwithdraws.append({
+                    "withdarw_id": withdrawid,
+                    "withdraw_channel":withdraw.withdraw_channel,
+                    "withdraw_amount":withdraw.withdraw_amount,
+                    "currency":withdraw.currency,
+                    "account_type":withdraw.account_type.code_name,
+                    "status":withdraw.status,
+                    "created":withdraw.created
+                })
+            return wwithdraws
+        else:
+            return 0
+        
+    def getAllPendingWithdraws(self,request,lang,user):
+        wwithdraws = []
+        userid = request.user.id
+        withdraws = Withdraw.objects.filter(user_id=userid)
+        if withdraws.exists:
+            for withdraw in withdraws:
+                withdrawid = withdraw.pk
+                if withdraw.status == "pending":
+                    wwithdraws.append({
+                    "withdarw_id": withdrawid,
+                    "withdraw_channel":withdraw.withdraw_channel,
+                    "withdraw_amount":withdraw.withdraw_amount,
+                    "currency":withdraw.currency,
+                    "account_type":withdraw.account_type.code_name,
+                    "status":withdraw.status,
+                    "created":withdraw.created.strftime("%d %b")
+                    })
+            return wwithdraws
+        else:
+            return "None"
+    
+    def getWithdrawById(self,request,lang,withdrawid):
+        withdraws = Withdraw.objects.filter(pk=withdrawid)
+        if withdraws.exists():
+            withdraw = withdraws.get()
+            return{
+                "withdarw_id": withdrawid,
+                "withdraw_channel":withdraw.withdraw_channel,
+                "withdraw_amount":withdraw.withdraw_amount,
+                "currency":withdraw.currency,
+                "account_type":withdraw.account_type.code_name,
+                "status":withdraw.status,
+                "created":withdraw.created
+            }
+    
+    def withdrawFromGoal(self,request,lang,goalid):
+        withdraw_channel = request.data["withdraw_channel"]
+        withdraw_amount = request.data["withdraw_amount"]
+        userid = request.user.id
+        currency = request.data["currency"]
+        account_type = request.data["account_type"]
+        created = datetime.datetime.now()
+        is_verified = request.user.userprofile.is_verified
+        account_type = AccountType.objects.filter(code_name=account_type).get()
+        status = "pending"
+        ## remember to verify the user
+        if is_verified is False:
+        # # create withdraw transaction
+            withdraw = Withdraw.objects.create(
+            withdraw_channel=withdraw_channel,
+            withdraw_amount=withdraw_amount,
+            currency=currency,
+            goal=Goal(pk=int(goalid)),
+            account_type=account_type,
+            user=User(pk=int(userid)),
+            status=status
+            )
+            withdrawid = withdraw.id
+            withdraw.save()
+            wwithdraw = self.getWithdrawById(request,lang,withdrawid)
+            goal = Goal.objects.filter(pk=goalid).get()
+            goalname = goal.goal
+            goal.save()
+            return {
+                "message": f"You have successfully withdrawn {currency} {withdraw_amount} from goal: {goalname}",
+                "success": True,
+                "user_id": userid,
+                "goal_id": goalid,
+                "withdraw_id": withdrawid,
+                "withdraw": wwithdraw,
+                "time of withdraw": created
+            }
+        else:
+            return{
+                "message": "your account is not verified, please check your email and verify",
+                "success": False
+            }
+            
+    def getWithdrawNetworths(self,request,lang,user):
+        no_goals = 0
+        goals = 0
+        userid = request.user.id
+        withdraw = Withdraw.objects.filter(user_id=userid)
+        for wwithdraw in withdraw:
+            goal = wwithdraw
+            amount = wwithdraw.withdraw_amount
+            if goal.goal is None:
+                no_goals+=amount
+            else:
+                goals+=amount
+        return goals,no_goals
+            
+            
+class Networths:
+    def __init__(self):
+        self.help = Helper()
+        
+    def getNetworth(self,request,lang,user):
+        totalDeposit = 0
+        userid = request.user.id
+        deposit = Deposit.objects.filter(user_id=userid)
+        for ddeposit in deposit:
+            amount = ddeposit.deposit_amount
+            totalDeposit+=amount
+        return totalDeposit
+        
+    def getGoalNetworth(self,request,lang,user):
+        no_goals = 0
+        goals = 0
+        userid = request.user.id
+        deposit = Deposit.objects.filter(user_id=userid)
+        for ddeposit in deposit:
+            goal = ddeposit
+            amount = ddeposit.deposit_amount
+            if goal.goal is None:
+                no_goals+=amount
+            else:
+                goals+=amount
+        withdraw = Withdraws.getWithdrawNetworths(Withdraws,request,lang,user)
+        networth = (no_goals*0.15)+no_goals
+        networths = networth - float(withdraw[1])
+        return goals,no_goals,networths
+
+class BankTransactions:
+    def __init__(self):
+        self.help = Helper()
+        
+    def createTransfer(self,request,lang,transaction):
+        userid = request.user.id
+        account_number = transaction[0]["data"]["account_number"]
+        bank_code = transaction[0]["data"]["bank_code"]
+        reference_id = transaction[0]["data"]["id"]
+        reference = transaction[0]["data"]["reference"]
+        created = transaction[0]["data"]["date_created"]
+        transfer = BankTransaction.objects.create(
+            user=User(pk=int(userid)),
+            account_number=account_number,
+            bank_code=bank_code,
+            reference_id=reference_id,
+            reference=reference,
+            created=created
+        )
+        transferid = transfer.id
+        transfer.save()
+        ttransfer = BankTransactions.getTransferById(self,request,lang,transferid)
+        return{
+            "message": f"Transaction made successfully",
+                "success": True,
+                "user_id": userid,
+                "transaction_id": transferid,
+                "transaction":ttransfer
+            }
+        
+    def getTransferById(self,request,lang,transferid):
+        transfer = BankTransaction.objects.filter(pk=transferid)
+        if transfer.exists():
+            ttransfer = transfer.get()
+            return{
+                "transaction_id": transferid,
+                "refrence_id": ttransfer.reference_id,
+                "reference": ttransfer.reference,
+                "account_number": ttransfer.account_number,
+                "bank_code":ttransfer.bank_code,
+                "created":ttransfer.created
+            }

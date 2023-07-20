@@ -361,7 +361,16 @@ class AccountType(models.Model):
     def __str__(self):
         return "%s" % self.type_name
 
-
+class BankTransaction(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    account_number = models.CharField(max_length=200)
+    bank_code = models.CharField(max_length=200)
+    reference_id = models.CharField(max_length=200)
+    reference = models.CharField(max_length=200)
+    created = models.CharField(max_length=200)
+    
+    def __str__(self):
+        return "%s" % self.reference_id
 
 class Goal(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -383,11 +392,28 @@ class Deposit(models.Model):
     deposit_amount = models.BigIntegerField(default=0)
     currency = models.CharField(max_length=200, default='UGX')
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
+    investment_option = models.CharField(max_length=200, default="risk_analysis")
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
+    transaction = models.CharField(max_length=200, default="")
 
     def __str__(self):
         return "%s - %s" % (self.user, self.deposit_amount)
+
+
+class Withdraw(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    withdraw_channel = models.CharField(max_length=200, default="bank")
+    withdraw_amount = models.BigIntegerField(default=0)
+    currency = models.CharField(max_length=200, default='UGX')
+    account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
+    created = models.DateTimeField(auto_now_add=True)
+    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
+    transaction = models.ForeignKey(BankTransaction, on_delete=models.CASCADE)
+    status = models.CharField(max_length=200,default="")
+
+    def __str__(self):
+        return "%s - %s" % (self.user, self.withdraw_amount)
 
 class DepositType(models.Model):
     type_name = models.CharField(max_length=200)
@@ -399,6 +425,15 @@ class DepositType(models.Model):
     def __str__(self):
         return "%s" % self.type_name
 
+
+class Networth(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    amount = models.BigIntegerField(default=0)
+    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return "%s" % self.amount
 
 class DepositTime(models.Model):
     time_name = models.CharField(max_length=200)

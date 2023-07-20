@@ -8,17 +8,20 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from .v1.users.Users import Users
-from .services import Deposits, Goals, NextOfKins, RiskProfiles
+from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths,BankTransactions
 from django.contrib.auth.models import User
+from rave_python import Rave, RaveExceptions
 
 # Create your views here.
 DEFAULT_LANG = "en"
 _user = Users()
 _deposit = Deposits()
+_withdraw = Withdraws()
 _goal = Goals()
 _nextOfKin = NextOfKins()
 _riskprofile = RiskProfiles()
-
+_networth = Networths()
+_transaction = BankTransactions()
 class index(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -65,6 +68,7 @@ class MakeDeposit(APIView):
         deposit_category = request.data["deposit_category"]
         deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
+        investment_option = request.data["investment_option"]
         account_type = request.data["account_type"]
         user = _user.getAuthUser(request, lang)
         ##########################
@@ -73,7 +77,7 @@ class MakeDeposit(APIView):
                 'message': "This field is required",
                 "type": "payment_means",
                 'success': False
-            }, status=400)
+            })
         elif not account_type:
             return Response({
                 'message': "This field is required",
@@ -84,6 +88,12 @@ class MakeDeposit(APIView):
             return Response({
                 'message': "This field is required",
                 "type": "deposit_category",
+                'success': False
+            })
+        elif not investment_option:
+            return Response({
+                'message': "This field is required",
+                "type": "investment_option",
                 'success': False
             })
         elif not deposit_amount:
@@ -97,7 +107,7 @@ class MakeDeposit(APIView):
                 'message': "This field is required",
                 "type": "currency",
                 'success': False
-            }, status=400)
+            })
         else:
             deposit = _deposit.createDeposit(request, lang, user)
             return Response(deposit)
@@ -116,6 +126,7 @@ class MakeDepositToGoal(APIView):
         currency = request.data["currency"]
         account_type = request.data["account_type"]
         goalid = request.data["goal_id"]
+        investment_option = request.data["investment_option"]
         user = _user.getAuthUser(request, lang)
         ##########################
         if not payment_means:
@@ -123,7 +134,13 @@ class MakeDepositToGoal(APIView):
                 'message': "This field is required",
                 "type": "payment_means",
                 'success': False
-            }, status=400)
+            })
+        elif not investment_option:
+            return Response({
+                'message': "This field is required",
+                "type": "investment_option",
+                'success': False
+            })
         elif not account_type:
             return Response({
                 'message': "This field is required",
@@ -440,3 +457,252 @@ class GetRiskProfile(APIView):
         user = _user.getAuthUser(request,lang)
         riskprofile = _riskprofile.getRiskProfile(request,lang,user)
         return Response(riskprofile)
+    
+
+class MakeWithdrawFromBank(APIView):
+    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
+        user = _user.getAuthUser(request,lang)
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw_channel = request.data["withdraw_channel"]
+        withdraw_amount = request.data["withdraw_amount"]
+        currency = request.data["currency"]
+        account_type = request.data["account_type"]
+        account_bank = request.data["account_bank"]
+        account_number = request.data["account_number"]
+        narration = "New Transfer"
+        beneficiary_name = request.data["beneficiary_name"]
+        if not withdraw_channel:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw channel"
+            }
+        elif not account_type:
+            return Response({
+                'message': "This field is required",
+                "type": "account_type",
+                'success': False
+            })
+        elif not withdraw_amount:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw amount"
+            }
+        elif not currency:
+            return Response({
+                'message': "This field is required",
+                "type": "currency",
+                'success': False
+            })
+        elif not account_bank:
+            return Response({
+                'message': "This field is required",
+                "type": "account bank",
+                'success': False
+            })
+        elif not account_number:
+            return Response({
+                'message': "This field is required",
+                "type": "account number",
+                'success': False
+            })
+        elif not beneficiary_name:
+            return Response({
+                'message': "This field is required",
+                "type": "beneficiary name",
+                'success': False
+            })
+        else:
+            transactions = []
+            try:
+                rave = Rave("FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X", "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X", usingEnv = False)
+
+                res = rave.Transfer.initiate({
+                    "account_bank": account_bank,
+                    "account_number": account_number,
+                    "amount": withdraw_amount,
+                    "narration": narration,
+                    "currency": currency,
+                    "beneficiary_name": beneficiary_name
+                })
+                transactions.append(res)
+                print(res)
+
+                balanceres = rave.Transfer.getBalance("UGX")
+                print(balanceres)
+
+            except RaveExceptions.IncompletePaymentDetailsError as e:
+                print(e)
+
+            except RaveExceptions.InitiateTransferError as e:
+                print(e.err)
+
+            except RaveExceptions.TransferFetchError as e:
+                print(e.err)
+
+            except RaveExceptions.ServerError as e:
+                print(e.err)
+            if transactions[0]["error"] is False:
+                transaction = _transaction.createTransfer(request,lang,transactions)
+                transactionid = transaction["transaction_id"]
+                withdraw = _withdraw.withdrawFromBank(request,lang,user,transactionid)
+            return Response(withdraw)
+
+
+class MakeWithdrawFromMobileMoney(APIView):
+    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
+        user = _user.getAuthUser(request,lang)
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw_channel = request.data["withdraw_channel"]
+        withdraw_amount = request.data["withdraw_amount"]
+        currency = request.data["currency"]
+        account_type = request.data["account_type"]
+        email = request.data["email"]
+        phone = request.data["phone"]
+        if not withdraw_channel:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw channel"
+            }
+        elif not withdraw_amount:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw amount"
+            }
+        elif not account_type:
+            return Response({
+                'message': "This field is required",
+                "type": "account_type",
+                'success': False
+            })
+        elif not currency:
+            return Response({
+                'message': "This field is required",
+                "type": "currency",
+                'success': False
+            })
+        elif not email:
+            return Response({
+                'message': "This field is required",
+                "type": "email",
+                'success': False
+            })
+        elif not phone:
+            return Response({
+                'message': "This field is required",
+                "type": "phone",
+                'success': False
+            })
+        else:
+            transactions = []
+            try:
+                rave = Rave("FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X", "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X", usingEnv = False)
+
+                res = rave.Transfer.initiate({
+                    "amount": withdraw_amount,
+                    "email": email,
+                    "phonenumber": phone,
+                    "IP": ""
+                    })
+                transactions.append(res)
+                print(res)
+
+                balanceres = rave.Transfer.getBalance("UGX")
+                print(balanceres)
+
+            except RaveExceptions.IncompletePaymentDetailsError as e:
+                    print(e)
+
+            except RaveExceptions.InitiateTransferError as e:
+                    print(e.err)
+
+            except RaveExceptions.TransferFetchError as e:
+                    print(e.err)
+
+            except RaveExceptions.ServerError as e:
+                    print(e.err)
+            if transactions[0].returnedData.status == "successful":
+                transaction = _transaction.createTransfer(request,lang,transactions)
+                transactionid = transaction["transaction_id"]
+                withdraw = _withdraw.withdrawFromBank(request,lang,user,transactionid)
+                return Response(withdraw)
+
+class GetWithdrawsByAuthUser(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang):
+        userid = request.user.id
+        user = _user.getAuthUserById(request, lang, userid)
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw = _withdraw.getAllWithdraws(request,lang,user)
+        return Response(withdraw)
+    
+class GetPendingWithdrawsByAuthUser(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang):
+        userid = request.user.id
+        user = _user.getAuthUserById(request, lang, userid)
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw = _withdraw.getAllPendingWithdraws(request,lang,user)
+        return Response(withdraw)
+    
+class GetWithdrawNetworths(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang):
+        userid = request.user.id
+        user = _user.getAuthUserById(request, lang, userid)
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw = _withdraw.getWithdrawNetworths(request,lang,user)
+        return Response(withdraw)
+
+class GetWithdrawsById(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang,withdrawid):
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw = _withdraw.getWithdrawById(request,lang,withdrawid)
+        return Response(withdrawid)
+    
+class GetNetworth(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang,user):
+        lang = DEFAULT_LANG if lang == None else lang
+        networth = _networth.getNetworth(request,lang)
+        return Response(networth)
+    
+class GetGoalNetworth(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang):
+        lang = DEFAULT_LANG if lang == None else lang
+        userid = request.user.id
+        user = _user.getAuthUserById(request, lang, userid)
+        networth = _networth.getGoalNetworth(request,lang,user)
+        return Response(networth)
+    

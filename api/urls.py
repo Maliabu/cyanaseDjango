@@ -35,6 +35,7 @@ upload = importlib.import_module(
 )
 ##################
 urlpatterns = [
+     
     path('', views.index.as_view(), name="index"),
     path('<str:lang>/register/user/',
          user_view.CreateAuthUser.as_view(), name="register-user"),
@@ -42,6 +43,16 @@ urlpatterns = [
          views.MakeDeposit.as_view(), name="make-deposit"),
     path('<str:lang>/get/deposit/',
          views.GetDepositsByAuthUser.as_view(), name="get-deposit"),
+    path('<str:lang>/make/bank/withdraw/',
+         views.MakeWithdrawFromBank.as_view(), name="make-bank-withdraw"),
+    path('<str:lang>/make/mm/withdraw/',
+         views.MakeWithdrawFromMobileMoney.as_view(), name="make-mm-withdraw"),
+    path('<str:lang>/get/withdraw/',
+         views.GetWithdrawsByAuthUser.as_view(), name="get-all-withdraws"),
+    path('<str:lang>/get/pending/withdraw/',
+         views.GetPendingWithdrawsByAuthUser.as_view(), name="get-all-pending-withdraws"),
+    path('<str:lang>/get/goal/withdraw/',
+         views.GetWithdrawNetworths.as_view(), name="get-goal-withdraws"),
     path('<str:lang>/get/deposit/by/id/',
          views.GetDepositsById.as_view(), name="get-deposit-by-id"),
     path('<str:lang>/get/deposit/by/goal/<int:goalid>/',
@@ -72,11 +83,15 @@ urlpatterns = [
          user_view.GetAuthUserById.as_view(), name="get-auth-user-by-id"),
     path('<str:lang>/auth/users/all/',
          user_view.GetAllUsers.as_view(), name="get-all-users"),
+    path('<str:lang>/auth/user/networth/',
+         views.GetGoalNetworth.as_view(), name="get-user-networth"),
+#     path('<str:lang>/auth/user/bank/transfer/',
+#          views.BankTransfer.as_view(), name="get-transfer"),
     path('<str:lang>/auth/user/profile/photo/',
          upload.UploadPhoto.as_view(), name="upload-photo"),
     path('<str:lang>/auth/user/update/password/',
          user_view.UpdateAuthUserPassword.as_view(), name="update-user-password"),
-    path('<str:lang>/email/verify/<str:userid>/',user_view.verifyAccount.as_view(),name = "verify-email"),
+    path('<str:lang>/email/verify/<str:userid>/?P',user_view.verifyAccount.as_view(),name = "verify-email"),
     path('<str:lang>/auth/user/delete/',user_view.DeleteUserAccount.as_view(),name = "delete-user-account")
 ]
 urlpatterns = urlpatterns + \
