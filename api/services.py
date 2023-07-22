@@ -523,12 +523,22 @@ class RiskProfiles:
                 risk_analysis = risk_analysis
             )
             for rrisk_profile in rriskprofile:
-                return {
-                    "message": "risk profile updated successfully",
-                    "success": True,
-                    "riskprofile_id":rrisk_profile.id,
-                    "status": rrisk_profile.is_complete
-                }
+                if rrisk_profile.risk_analysis != "Incomplete Risk Profile":
+                    rrisk_profile.is_complete is True
+                    return {
+                        "message": "risk profile updated successfully",
+                        "success": True,
+                        "riskprofile_id":rrisk_profile.id,
+                        "status": rrisk_profile.is_complete
+                    }
+                else:
+                    rrisk_profile.is_complete is False
+                    return {
+                        "message": "risk profile updated successfully",
+                        "success": True,
+                        "riskprofile_id":rrisk_profile.id,
+                        "status": rrisk_profile.is_complete
+                    }
         else:
             # create the risk profile
             riskprofile = RiskProfile.objects.create(

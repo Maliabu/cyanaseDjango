@@ -207,7 +207,7 @@ class MakeDepositToBank(APIView):
             })
         else:
             transactions = []
-            rave = Rave("FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X", "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X", usingEnv = False)
+            rave = Rave("FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X", "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X", usingEnv = False)
             payload = {
                 "cardno": cardno,
                 "cvv": cvv,
