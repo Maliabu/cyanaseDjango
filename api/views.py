@@ -72,6 +72,7 @@ class MakeDeposit(APIView):
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
+        txRef = request.data["tx_ref"]
         user = _user.getAuthUser(request, lang)
         ##########################
         if not payment_means:
@@ -122,7 +123,25 @@ class MakeDeposit(APIView):
                 "type": "reference",
                 'success': False
             })
+        elif not txRef:
+            return Response({
+                'message': "This field is required",
+                "type": "txRef",
+                'success': False
+            })
         else:
+            rave = Rave("FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X", "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X", usingEnv = False)
+            try:
+                res = rave.Card.verify(txRef)
+                print(res["transactionComplete"])
+            except RaveExceptions.TransactionVerificationError as e:
+                print(e.err["errMsg"])
+                print(e.err["txRef"])
+                if e:
+                    return Response({
+                        'message': "Something went wrong. Deposit unsuccessful",
+                        'success': False
+                    })
             deposit = _deposit.createDeposit(request, lang, user)
             return Response(deposit)
 
