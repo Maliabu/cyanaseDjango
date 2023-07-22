@@ -1,3 +1,4 @@
+
 import datetime
 from .models import *
 from .helper.helper import Helper
@@ -6,6 +7,82 @@ from django.contrib.auth.models import User
 
 
 _helper = Helper()
+class Subscriptions:
+    def __init__(self):
+        self.help = Helper()
+    
+    def getSubscriptionStatus(self,request,lang,userid):
+        # account creation date
+        account_date = User.objects.filter(pk=userid).get()
+        start_date = account_date.date_joined
+        startt_date = datetime.datetime.strptime(start_date.strftime("%Y/%m/%d"), "%Y/%m/%d")
+        now = datetime.datetime.now()
+        noww = datetime.datetime.strptime(now.strftime("%Y/%m/%d"),"%Y/%m/%d")
+        delta = noww - startt_date
+        time = delta.days
+        created = datetime.datetime.now()
+        reference = ""
+        referenceid = 0
+        amount = 0
+        currency = "UGX"
+        subscribe = Subscription.objects.create(
+            user=User(pk=int(userid)),
+            days_left=time,
+            reference=reference,
+            reference_id=referenceid,
+            amount=amount,
+            currency=currency
+        )
+        # change status to True
+        subscribe.is_subscribed == True
+        subscribe.save()
+        subscriptionid = subscribe.pk
+        if time < 30 and referenceid == 0:
+            return{
+                "status":"pending subscription",
+                "days passed":time
+            }
+        elif time > 30 and referenceid == 0:
+            return{
+                "status":"subscription overdue",
+                "days passed":time
+            }
+        if referenceid != 0:
+            return{
+                "status":"Subscribed"
+            }
+    
+    def subscribe(self,request,lang,userid):
+        days_left = self.getSubscriptionStatus
+        created = datetime.datetime.now()
+        reference = request.data["reference"]
+        referenceid = request.data["reference_id"]
+        amount = 20500
+        currency = "UGX"
+        subscribe = Subscription.objects.create(
+            user=User(pk=int(userid)),
+            days_left=days_left,
+            reference=reference,
+            reference_id=referenceid,
+            amount=amount,
+            currency=currency
+        )
+        # change status to True
+        subscribe.is_subscribed == True
+        subscribe.save()
+        subscriptionid = subscribe.pk
+        return({
+            "message":"You have subscribed successfully",
+            "success": True,
+            "user_id":userid,
+            "subscription_id":subscriptionid,
+            "reference_id":referenceid,
+            "subscription_amount": amount,
+            "currency":currency,
+            "reference":reference,
+            "days_left":days_left,
+            "created":created
+        })
 class Deposits:
     def __init__(self):
         self.help = Helper()
@@ -99,6 +176,7 @@ class Deposits:
                 depo.append({"name":item, "datas":amount.deposit_amount/1000,"date":amount.created.strftime("%d %b")})
                 dates.append(amount.created.strftime("%d %b"))
         # myData = list({names["name"]:names for names in depo}.values())
+        # deposits.sort(reverse=True)
         return totalDepositUGX,totalDepositUSD,totalUGX,totalUSD,depo,dates,deposits,goalDepositsUGX
     
     def depositToGoal(self,request,lang,user,goalid):
@@ -109,6 +187,8 @@ class Deposits:
         deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
         account_type = request.data["account_type"]
+        reference = request.data["reference"]
+        reference_id = request.data["reference_id"]
         # get the user from Authorised user in token
         userid = request.user.id
         user_name = request.user.first_name
@@ -128,7 +208,9 @@ class Deposits:
                 deposit_category=deposit_category,
                 investment_option = investment_option,
                 currency=currency,
-                account_type=account_type
+                account_type=account_type,
+                reference = reference,
+                reference_id = reference_id
             )
             deposit.save()
             # # get deposit id
@@ -164,6 +246,8 @@ class Deposits:
         investment_option = request.data["investment_option"]
         currency = request.data["currency"]
         account_type = request.data["account_type"]
+        reference = request.data["reference"]
+        reference_id = request.data["reference_id"]
         # get the user from Authorised user in token
         userid = request.user.id
         user_name = request.user.first_name
@@ -176,12 +260,14 @@ class Deposits:
         if is_verified is False:
             deposit = Deposit.objects.create(
                 deposit_amount=float(request.data["deposit_amount"]),
-                payment_means=request.data["payment_means"],
+                payment_means=payment_means,
                 user=User(pk=int(userid)),
                 deposit_category=deposit_category,
                 investment_option=investment_option,
                 currency=currency,
-                account_type=account_type
+                account_type=account_type,
+                reference=reference,
+                reference_id=reference_id
             )
             deposit.save()
             # # get deposit id
@@ -462,7 +548,7 @@ class RiskProfiles:
                 user=User(pk=int(userid)),
                 risk_analysis = risk_analysis
             )
-            if riskprofile.risk_analysis is not "Incomplete Risk Profile":
+            if riskprofile.risk_analysis != "Incomplete Risk Profile":
                 riskprofile.is_complete = True
                 riskprofile.save()
                 riskprofileid = riskprofile.id
@@ -500,44 +586,36 @@ class Withdraws:
     def __init__(self):
         self.help = Helper()
         
-    def withdrawFromBank(self,request,lang,user,transactionid):
+    def withdraw(self,request,lang,user,transactionid):
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         userid = request.user.id
         currency = request.data["currency"]
         account_type = request.data["account_type"]
         created = datetime.datetime.now()
-        is_verified = request.user.userprofile.is_verified
         account_type = AccountType.objects.filter(code_name=account_type).get()
         status = "pending"
-        ## remember to verify the user
-        if is_verified is False:
-            withdraw = Withdraw.objects.create(
-                withdraw_channel=withdraw_channel,
-                withdraw_amount=withdraw_amount,
-                currency=currency,
-                account_type=account_type,
-                user=User(pk=int(userid)),
-                transaction=BankTransaction(pk=int(transactionid)),
-                status=status
-            )
-            withdrawid = withdraw.id
-            withdraw.save()
-            wwithdraw = self.getWithdrawById(request,lang,withdrawid)
-            return{
-               "message": f"You have successfully withdrawn {currency} {withdraw_amount} from your {account_type} account",
-                "success": True,
-                "user_id":userid,
-                "withdraw_id": withdrawid,
-                "withdraw": wwithdraw,
-                "time withdraw was created": created,
-                "transaction":transactionid
-            }
-        else:
-            return{
-                "message": "your account is not verified, please check your email and verify",
-                "success": False
-            }
+        withdraw = Withdraw.objects.create(
+                    withdraw_channel=withdraw_channel,
+                    withdraw_amount=withdraw_amount,
+                    currency=currency,
+                    account_type=account_type,
+                    user=User(pk=int(userid)),
+                    transaction=BankTransaction(pk=int(transactionid)),
+                    status=status
+                )
+        withdrawid = withdraw.id
+        withdraw.save()
+        wwithdraw = self.getWithdrawById(request,lang,withdrawid)
+        return{
+                    "message": f"Your withdraw is now pending",
+                    "success": True,
+                    "user_id":userid,
+                    "withdraw_id": withdrawid,
+                    "withdraw": wwithdraw,
+                    "time withdraw was created": created,
+                    "transaction":transactionid
+                }
         
     def getAllWithdraws(self,request,lang,user):
         wwithdraws = []

@@ -45,3 +45,6 @@
 # except RaveExceptions.TransactionVerificationError as e:
 #     print(e.err["errMsg"])
 #     print(e.err["txRef"])
+    
+    
+# (True, {'settlement_id': 'NEW', 'id': 36071, 'AccountId': 49278, 'TransactionId': 1664979, 'FlwRef': 'FLW-MOCK-62986ef948d6dd127102cdb58813d216', 'walletId': 50309, 'AmountRefunded': '5000', 'status': 'completed', 'destination': 'payment_source', 'meta': '{"source":"ledgerbalance","uniquereference":"62472228710"}', 'updatedAt': '2021-01-23T01:27:11.969Z', 'createdAt': '2021-01-23T01:27:08.672Z'})

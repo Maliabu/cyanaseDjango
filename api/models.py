@@ -395,7 +395,8 @@ class Deposit(models.Model):
     investment_option = models.CharField(max_length=200, default="risk_analysis")
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
-    transaction = models.CharField(max_length=200, default="")
+    reference = models.CharField(max_length=200,default="")
+    reference_id = models.IntegerField(default=0)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.deposit_amount)
@@ -425,6 +426,18 @@ class DepositType(models.Model):
     def __str__(self):
         return "%s" % self.type_name
 
+class Subscription(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_subscribed = models.BooleanField(default=False)
+    days_left = models.IntegerField(default=30)
+    reference_id = models.IntegerField(default=0)
+    reference = models.CharField(max_length=200)
+    amount = models.BigIntegerField(default=0)
+    currency = models.CharField(max_length=200, default='UGX')
+    created = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return "%s" % self.is_subscribed
 
 class Networth(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
