@@ -120,7 +120,7 @@ class MakeDeposit(APIView):
         elif not reference_id:
             return Response({
                 'message': "This field is required",
-                "type": "reference",
+                "type": "reference_id",
                 'success': False
             })
         elif not txRef:
@@ -142,8 +142,15 @@ class MakeDeposit(APIView):
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
-            deposit = _deposit.createDeposit(request, lang, user)
-            return Response(deposit)
+            tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
+            if tx_ref["success"] == True:
+                return Response({
+                        'message': "Something went wrong. Deposit unsuccessful",
+                        'success': False
+                    })
+            else:
+                deposit = _deposit.createDeposit(request, lang, user)
+                return Response(deposit)
 
 class MakeDepositToBank(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]

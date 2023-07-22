@@ -128,7 +128,25 @@ class Deposits:
             return {
                 "0"
             }
-    
+            
+    def getTxRefById(self,request,lang,user,txRef):
+        tx_ref = 0
+        userid = request.user.id
+        ddeposits = Deposit.objects.filter(user_id=userid)
+        if ddeposits.exists():
+            for deposit in ddeposits:
+                tx_ref = deposit.txRef
+                if tx_ref == txRef:
+                    return {
+                        "message":"txRef matches",
+                        "success": True
+                    }
+        else:
+            return {
+                        "message":"No deposits found for your account",
+                        "success": False
+                    }
+            
     def getAllDeposits(self,request,lang,user):
         deposits = []
         options = []
@@ -189,6 +207,7 @@ class Deposits:
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
+        txRef = request.data["tx_ref"]
         # get the user from Authorised user in token
         userid = request.user.id
         user_name = request.user.first_name
@@ -201,8 +220,8 @@ class Deposits:
         if is_verified is False:
         # # create deposit
             deposit = Deposit.objects.create(
-                deposit_amount=float(request.data["deposit_amount"]),
-                payment_means=request.data["payment_means"],
+                deposit_amount=float(deposit_amount),
+                payment_means=payment_means,
                 user=User(pk=int(userid)),
                 goal=Goal(pk=int(goalid)),
                 deposit_category=deposit_category,
@@ -210,7 +229,8 @@ class Deposits:
                 currency=currency,
                 account_type=account_type,
                 reference = reference,
-                reference_id = reference_id
+                reference_id = reference_id,
+                txRef=txRef
             )
             deposit.save()
             # # get deposit id
@@ -248,6 +268,7 @@ class Deposits:
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
+        txRef = request.data["tx_ref"]
         # get the user from Authorised user in token
         userid = request.user.id
         user_name = request.user.first_name
@@ -267,7 +288,8 @@ class Deposits:
                 currency=currency,
                 account_type=account_type,
                 reference=reference,
-                reference_id=reference_id
+                reference_id=reference_id,
+                txRef=txRef
             )
             deposit.save()
             # # get deposit id

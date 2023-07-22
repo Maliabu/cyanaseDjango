@@ -397,6 +397,7 @@ class Deposit(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     reference = models.CharField(max_length=200,default="")
     reference_id = models.IntegerField(default=0)
+    txRef = models.IntegerField(default=0)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.deposit_amount)
