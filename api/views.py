@@ -14,6 +14,10 @@ from rave_python import Rave, RaveExceptions,Misc
 
 # Create your views here.
 DEFAULT_LANG = "en"
+DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
+DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
+SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
+SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
 _user = Users()
 _deposit = Deposits()
 _withdraw = Withdraws()
@@ -130,7 +134,7 @@ class MakeDeposit(APIView):
                 'success': False
             })
         else:
-            rave = Rave("FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X", "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X", usingEnv = False)
+            rave = Rave(DEPOSIT_PUB_KEY,DEPOSIT_SEC_KEY, usingEnv = False)
             try:
                 res = rave.Card.verify(txRef)
                 print(res["transactionComplete"])
@@ -233,7 +237,7 @@ class MakeDepositToBank(APIView):
             })
         else:
             transactions = []
-            rave = Rave("FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X", "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X", usingEnv = False)
+            rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
             payload = {
                 "cardno": cardno,
                 "cvv": cvv,
@@ -718,15 +722,22 @@ class MakeWithdrawFromBank(APIView):
             })
         else:
             if is_verified is False:
-                if is_subscribed < 30:
+                if is_subscribed["status"] != "subscribed":
+                    _type = ""
+                    if withdraw_channel == "bank":
+                        _type = "account"
+                    if withdraw_channel == "mobile money":
+                        _type = "mobilemoney"
+                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
                     transactions = []
                     try:
-                        rave = Rave("FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X", "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X", usingEnv = False)
+                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
 
                         res = rave.Transfer.initiate({
                     "account_bank": account_bank,
                     "account_number": account_number,
-                    "amount": withdraw_amount,
+                    "amount": total_withdraw,
                     "narration": narration,
                     "currency": currency,
                     "beneficiary_name": beneficiary_name
@@ -764,6 +775,161 @@ class MakeWithdrawFromBank(APIView):
                     "success": False
                 })
 
+
+class MakeGoalWithdrawFromBank(APIView):
+    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
+        user = _user.getAuthUser(request,lang)
+        userid = user["user_id"]
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw_channel = request.data["withdraw_channel"]
+        withdraw_amount = request.data["withdraw_amount"]
+        currency = request.data["currency"]
+        account_type = request.data["account_type"]
+        account_bank = request.data["account_bank"]
+        account_number = request.data["account_number"]
+        goalid = request.data["goalid"]
+        narration = "Withdraw"
+        beneficiary_name = request.data["beneficiary_name"]
+        is_verified = request.user.userprofile.is_verified
+        is_subscribed = _subscription.getSubscriptionStatus(request,lang,userid)
+        if not withdraw_channel:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw channel"
+            }
+        elif not account_type:
+            return Response({
+                'message': "This field is required",
+                "type": "account_type",
+                'success': False
+            })
+        elif not withdraw_amount:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw amount"
+            }
+        elif not currency:
+            return Response({
+                'message': "This field is required",
+                "type": "currency",
+                'success': False
+            })
+        elif not account_bank:
+            return Response({
+                'message': "This field is required",
+                "type": "account bank",
+                'success': False
+            })
+        elif not account_number:
+            return Response({
+                'message': "This field is required",
+                "type": "account number",
+                'success': False
+            })
+        elif not beneficiary_name:
+            return Response({
+                'message': "This field is required",
+                "type": "beneficiary name",
+                'success': False
+            })
+        elif not goalid:
+            return Response({
+                'message': "This field is required",
+                "type": "goalid",
+                'success': False
+            })
+        else:
+            if is_verified is False:
+                if is_subscribed["status"] != "subscribed":
+                    _type = ""
+                    if withdraw_channel == "bank":
+                        _type = "account"
+                    if withdraw_channel == "mobile money":
+                        _type = "mobilemoney"
+                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+                    transactions = []
+                    try:
+                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+
+                        res = rave.Transfer.initiate({
+                    "account_bank": account_bank,
+                    "account_number": account_number,
+                    "amount": total_withdraw,
+                    "narration": narration,
+                    "currency": currency,
+                    "beneficiary_name": beneficiary_name
+                    })
+                        transactions.append(res)
+                        print(res)
+
+                        balanceres = rave.Transfer.getBalance("UGX")
+                        print(balanceres)
+
+                    except RaveExceptions.IncompletePaymentDetailsError as e:
+                        print(e)
+
+                    except RaveExceptions.InitiateTransferError as e:
+                        print(e.err)
+
+                    except RaveExceptions.TransferFetchError as e:
+                        print(e.err)
+
+                    except RaveExceptions.ServerError as e:
+                        print(e.err)
+                    if transactions[0]["error"] is False:
+                        transaction = _transaction.createTransfer(request,lang,transactions)
+                        transactionid = transaction["transaction_id"]
+                        withdraw = _withdraw.withdrawFromGoal(request,lang,goalid,user,transactionid)
+                        return Response(withdraw)
+                else:
+                    return Response({
+                        "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
+                        "success": False
+                    })
+            else:
+                return Response({
+                    "message": "your account is not verified, please check your email and verify",
+                    "success": False
+                })
+
+class GetWithdrawFee(APIView):
+    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self,request,lang, *args, **kwargs):
+        userid = request.user.id
+        withdraw_amount = request.data["withdraw_amount"]
+        currency = request.data["currency"]
+        _type = request.data["type"]
+        if not currency:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "currency"
+            }
+        elif not _type:
+            return Response({
+                'message': "This field is required",
+                "type": "type",
+                'success': False
+            })
+        elif not withdraw_amount:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw amount"
+            }
+        else:
+            withdraw_fee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+            return Response(withdraw_fee)
 
 class MakeWithdrawFromMobileMoney(APIView):
     authentication_classes = [SessionAuthentication,TokenAuthentication]
@@ -827,14 +993,21 @@ class MakeWithdrawFromMobileMoney(APIView):
             })
         else:
             if is_verified is False:
-                if is_subscribed > 30:
+                if is_subscribed["status"] != "subscribed":
+                    _type = ""
+                    if withdraw_channel == "bank":
+                        _type = "account"
+                    if withdraw_channel == "mobile money":
+                        _type = "mobilemoney"
+                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
                     transactions = []
-                    rave = Rave("FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X", "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X", usingEnv = False)
+                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
 
                     details = {
                             "account_bank": account_bank,
                             "account_number": account_number,
-                            "amount": withdraw_amount,
+                            "amount": total_withdraw,
                             "currency": currency,
                             "beneficiary_name": beneficiary_name,
                                 "meta": {
@@ -849,6 +1022,117 @@ class MakeWithdrawFromMobileMoney(APIView):
                         transaction = _transaction.createTransfer(request,lang,transactions)
                         transactionid = transaction["transaction_id"]
                         withdraw = _withdraw.withdraw(request,lang,user,transactionid)
+                        return Response(withdraw)
+                else:
+                    return Response({
+                        "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
+                        "success": False
+                    })
+            else:
+                return Response({
+                    "message": "your account is not verified, please check your email and verify",
+                    "success": False
+                })
+                
+                
+class MakeGoalWithdrawFromMobileMoney(APIView):
+    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
+        user = _user.getAuthUser(request,lang)
+        userid = user["user_id"]
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw_channel = request.data["withdraw_channel"]
+        withdraw_amount = request.data["withdraw_amount"]
+        currency = request.data["currency"]
+        goalid = request.data["goalid"]
+        account_type = request.data["account_type"]
+        account_bank = request.data["account_bank"]
+        account_number = request.data["account_number"]
+        beneficiary_name = request.data["beneficiary_name"]
+        is_verified = request.user.userprofile.is_verified
+        is_subscribed = _subscription.getSubscriptionStatus(request,lang,userid)
+        if not withdraw_channel:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw channel"
+            }
+        elif not withdraw_amount:
+            return{
+                "message": "This field is required",
+                "success": False,
+                "type": "withdraw amount"
+            }
+        elif not account_type:
+            return Response({
+                'message': "This field is required",
+                "type": "account_type",
+                'success': False
+            })
+        elif not currency:
+            return Response({
+                'message': "This is required",
+                "type": "currency",
+                'success': False
+            })
+        elif not account_bank:
+            return Response({
+                'message': "This field is required",
+                "type": "account bank",
+                'success': False
+            })
+        elif not account_number:
+            return Response({
+                'message': "This field is required",
+                "type": "account number",
+                'success': False
+            })
+        elif not beneficiary_name:
+            return Response({
+                'message': "This field is required",
+                "type": "beneficiary name",
+                'success': False
+            })
+        elif not goalid:
+            return Response({
+                'message': "This field is required",
+                "type": "goalid",
+                'success': False
+            })
+        else:
+            if is_verified is False:
+                if is_subscribed["status"] != "subscribed":
+                    _type = ""
+                    if withdraw_channel == "bank":
+                        _type = "account"
+                    if withdraw_channel == "mobile money":
+                        _type = "mobilemoney"
+                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+                    transactions = []
+                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+
+                    details = {
+                            "account_bank": account_bank,
+                            "account_number": account_number,
+                            "amount": total_withdraw,
+                            "currency": currency,
+                            "beneficiary_name": beneficiary_name,
+                                "meta": {
+                                "sender": "Flutterwave Developers",
+                                "sender_country": "ZA",
+                                "mobile_number": "23457558595"
+                                }
+                            }
+                    res = rave.Transfer.initiate(details)
+                    transactions.append(res)
+                    if transactions[0]["error"] is False:
+                        transaction = _transaction.createTransfer(request,lang,transactions)
+                        transactionid = transaction["transaction_id"]
+                        withdraw = _withdraw.withdrawFromGoal(request,lang,goalid,user,transactionid)
                         return Response(withdraw)
                 else:
                     return Response({
@@ -950,13 +1234,14 @@ class Subscribe(APIView):
         userid = user["user_id"]
         reference = request.data["reference"]
         referenceid = request.data["reference_id"]
+        amount = request.data["amount"]
         lang = DEFAULT_LANG if lang == None else lang
-        transaction = request.data["transaction"]
-        if not transaction:
+        txRef = request.data["tx_ref"]
+        if not txRef:
             return Response({
                 "message": "This field is required",
                 "success": False,
-                "type": "withdraw channel"
+                "type": "txRef"
             })
         elif not referenceid:
             return Response({
@@ -968,8 +1253,34 @@ class Subscribe(APIView):
             return Response({
                 "message": "This field is required",
                 "success": False,
-                "type": "refrence number"
+                "type": "reference number"
+            })
+        elif not amount:
+            return Response({
+                "message": "This field is required",
+                "success": False,
+                "type": "amount"
             })
         else:
-            subscribe = _subscription.subscribe(request,lang,userid)
-            return Response(subscribe)
+            # rave = Rave("FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X", "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X", usingEnv = False)
+            rave = Rave(SUB_PUB_KEY, SUB_SEC_KEY, usingEnv = False)
+            try:
+                res = rave.Card.verify(txRef)
+                print(res["transactionComplete"])
+            except RaveExceptions.TransactionVerificationError as e:
+                print(e.err["errMsg"])
+                print(e.err["txRef"])
+                if e:
+                    return Response({
+                        'message': "Something went wrong. Subscription unsuccessful - e",
+                        'success': False
+                    })
+            tx_ref = _subscription.getTxRefById(request,lang,user,txRef)
+            if tx_ref["success"] == True:
+                return Response({
+                        'message': "Something went wrong. Subscription unsuccessful - tx",
+                        'success': False
+                    })
+            else:
+                subscribe = _subscription.subscribe(request,lang,userid)
+                return Response(subscribe)

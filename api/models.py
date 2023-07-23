@@ -436,6 +436,7 @@ class Subscription(models.Model):
     amount = models.BigIntegerField(default=0)
     currency = models.CharField(max_length=200, default='UGX')
     created = models.DateTimeField(auto_now_add=True)
+    txRef = models.IntegerField(default=0)
     
     def __str__(self):
         return "%s" % self.is_subscribed

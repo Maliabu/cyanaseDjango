@@ -4,6 +4,9 @@ from .models import *
 from .helper.helper import Helper
 from .v1.locale import Locale
 from django.contrib.auth.models import User
+import requests
+
+BEARER = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
 
 
 _helper = Helper()
@@ -20,69 +23,133 @@ class Subscriptions:
         noww = datetime.datetime.strptime(now.strftime("%Y/%m/%d"),"%Y/%m/%d")
         delta = noww - startt_date
         time = delta.days
-        created = datetime.datetime.now()
-        reference = ""
-        referenceid = 0
-        amount = 0
-        currency = "UGX"
-        subscribe = Subscription.objects.create(
-            user=User(pk=int(userid)),
-            days_left=time,
-            reference=reference,
-            reference_id=referenceid,
-            amount=amount,
-            currency=currency
-        )
-        # change status to True
-        subscribe.is_subscribed == True
-        subscribe.save()
-        subscriptionid = subscribe.pk
-        if time < 30 and referenceid == 0:
-            return{
-                "status":"pending subscription",
-                "days passed":time
-            }
-        elif time > 30 and referenceid == 0:
-            return{
-                "status":"subscription overdue",
-                "days passed":time
-            }
-        if referenceid != 0:
-            return{
-                "status":"Subscribed"
+        subscribed = Subscription.objects.filter(user_id=userid)
+        if subscribed.exists():
+            for subscription in subscribed:
+                if subscription.is_subscribed == True:
+                    return{
+                        "status":"subscribed",
+                        "days_passed":time
+                    }
+                elif subscription.is_subscribed == False and subscription.days_left < 30:
+                    return{
+                        "status":"pending subscription",
+                        "days_passed":time
+                    }
+                elif subscription.is_subscribed == False and subscription.days_left > 30:
+                    return{
+                        "status":"subscription overdue",
+                        "days_passed":time
+                    }
+                else:
+                    return{
+                        "status":"pending subscription",
+                        "days_passed":time
+                    }
+        else:
+            if time < 30:
+                return{
+                        "status":"pending subscription",
+                        "days_passed":time
+                    }
+            else:
+                return{
+                        "status":"subscription overdue",
+                        "days_passed":time
+                    }
+    
+    
+    def getTxRefById(self,request,lang,user,txRef):
+        tx_ref = 0
+        userid = request.user.id
+        subscriptions = Subscription.objects.filter(user_id=userid)
+        if subscriptions.exists():
+            for subscription in subscriptions:
+                tx_ref = subscription.txRef
+                if tx_ref == txRef:
+                    return {
+                        "message":"txRef matches",
+                        "success": True
+                    }
+                else:
+                    return {
+                        "message":"No subscriptions found for your account",
+                        "success": False
+                    }
+        else:
+            return {
+                "message":"No subscriptions found for your account",
+                "success": False
             }
     
     def subscribe(self,request,lang,userid):
-        days_left = self.getSubscriptionStatus
+        days_left = self.getSubscriptionStatus(request,lang,userid)
+        days_remaining = days_left["days_passed"]
         created = datetime.datetime.now()
         reference = request.data["reference"]
         referenceid = request.data["reference_id"]
+        txRef = request.data["tx_ref"]
         amount = 20500
         currency = "UGX"
-        subscribe = Subscription.objects.create(
-            user=User(pk=int(userid)),
-            days_left=days_left,
-            reference=reference,
-            reference_id=referenceid,
-            amount=amount,
-            currency=currency
-        )
-        # change status to True
-        subscribe.is_subscribed == True
-        subscribe.save()
-        subscriptionid = subscribe.pk
-        return({
-            "message":"You have subscribed successfully",
-            "success": True,
-            "user_id":userid,
-            "subscription_id":subscriptionid,
-            "reference_id":referenceid,
-            "subscription_amount": amount,
-            "currency":currency,
-            "reference":reference,
-            "days_left":days_left,
-            "created":created
-        })
+        # lets make sure the user pays the right amount
+        subscription_amount = request.data["amount"]
+        if str(subscription_amount) != str(amount):
+            print(amount,subscription_amount)
+            return ({
+                "message":"Something went wrong. Subscription unsuccessful - amount",
+                "success": False
+            })
+        else:
+            old_subscription = Subscription.objects.filter(user_id=userid)
+            if old_subscription.exists():
+                old_subscription.update(
+                    user=User(pk=int(userid)),
+                    days_left=days_remaining,
+                    reference=reference,
+                    reference_id=referenceid,
+                    amount=float(amount),
+                    currency=currency,
+                    txRef=txRef
+                )
+                for subscription in old_subscription:
+                    return({
+                        "message":"You have subscribed successfully",
+                    "success": True,
+                    "user_id":userid,
+                    "subscription_id":subscription.id,
+                    "reference_id":subscription.reference_id,
+                    "subscription_amount": subscription.amount,
+                    "currency":subscription.currency,
+                    "reference":subscription.reference,
+                    "days_left":subscription.days_left,
+                    "created":subscription.created
+                    })
+            else:
+                subscribe = Subscription.objects.create(
+                    user=User(pk=int(userid)),
+                    days_left=days_remaining,
+                    reference=reference,
+                    reference_id=referenceid,
+                    amount=float(amount),
+                    currency=currency,
+                    txRef=txRef
+                )
+                # change status to True
+                subscribe.is_subscribed = True
+                subscribe.save()
+                subscriptionid = subscribe.pk
+                return({
+                    "message":"You have subscribed successfully",
+                    "success": True,
+                    "user_id":userid,
+                    "subscription_id":subscriptionid,
+                    "reference_id":referenceid,
+                    "subscription_amount": amount,
+                    "currency":currency,
+                    "reference":reference,
+                    "days_left":days_left,
+                    "created":created
+                })
 class Deposits:
     def __init__(self):
         self.help = Helper()
@@ -108,11 +175,15 @@ class Deposits:
         if Deposit.objects.filter(goal_id=goalid).exists():
             ddeposit = Deposit.objects.filter(goal_id=goalid)
             totalDeposit = 0
+            withdraw = Withdraws.getWithdrawsByGoalId(Withdraws,request,lang,goalid)
+            withdraw_list = list(withdraw)
+            networth = 0
             getDeposits = []
             goal = Goal.objects.filter(pk=goalid)
             for deposit in ddeposit:
                 amount = deposit.deposit_amount
                 totalDeposit += amount
+                networth = float((totalDeposit*0.15)+totalDeposit) - float(withdraw_list[0])
                 for goals in goal:
                     getDeposits.append({
                         "deposit_id":deposit.id,
@@ -123,7 +194,7 @@ class Deposits:
                         "investment_option":deposit.investment_option,
                         "account_type":deposit.account_type.code_name
                     })
-            return totalDeposit,getDeposits
+            return totalDeposit,networth,getDeposits
         else:
             return {
                 "0"
@@ -140,6 +211,11 @@ class Deposits:
                     return {
                         "message":"txRef matches",
                         "success": True
+                    }
+                else:
+                    return {
+                        "message":"No deposits found for your account",
+                        "success": False
                     }
         else:
             return {
@@ -370,7 +446,8 @@ class Goals:
         if ggoals.exists:
             for goal in ggoals:
                 goalid = goal.pk
-                deposit = Deposits.getDeopsitByGoalId(Deposits,request,lang,goalid=goalid)
+                deposit = Deposits.getDeopsitByGoalId(Deposits,request,lang,goalid)
+                withdraw = Withdraws.getWithdrawsByGoalId(Withdraws,request,lang,goalid)
                 goals.append({
                 "user_id":goal.user.id,
                 "goal_id":goalid,
@@ -380,7 +457,8 @@ class Goals:
                 "deposit_type": goal.deposit_type,
                 "deposit_reminder_day": goal.deposit_reminder_day,
                 "created": goal.created,
-                "deposit": deposit
+                "deposit": deposit,
+                "withdraw":withdraw
                 }
                 )
             return totalUGX,totalUSD,goals
@@ -703,8 +781,31 @@ class Withdraws:
                 "status":withdraw.status,
                 "created":withdraw.created
             }
+            
+    def getWithdrawsByGoalId(self, request,lang, goalid):
+        if Withdraw.objects.filter(goal_id=goalid).exists():
+            wwithdraw = Withdraw.objects.filter(goal_id=goalid)
+            totalWithdraw = 0
+            getWithdraws = []
+            goal = Goal.objects.filter(pk=goalid)
+            for withdraw in wwithdraw:
+                amount = withdraw.withdraw_amount
+                totalWithdraw += amount
+                for goals in goal:
+                    getWithdraws.append({
+                        "withdraw_id":withdraw.id,
+                        "withdraw_amount":withdraw.withdraw_amount,
+                        "currency":withdraw.currency,
+                        "withdraw_channel":withdraw.withdraw_channel,
+                        "account_type":withdraw.account_type.code_name
+                    })
+            return totalWithdraw,getWithdraws
+        else:
+            return {
+                "0"
+            }
     
-    def withdrawFromGoal(self,request,lang,goalid):
+    def withdrawFromGoal(self,request,lang,goalid,user,transactionid):
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         userid = request.user.id
@@ -724,7 +825,8 @@ class Withdraws:
             goal=Goal(pk=int(goalid)),
             account_type=account_type,
             user=User(pk=int(userid)),
-            status=status
+            status=status,
+            transaction=BankTransaction(pk=int(transactionid))
             )
             withdrawid = withdraw.id
             withdraw.save()
@@ -760,8 +862,23 @@ class Withdraws:
             else:
                 goals+=amount
         return goals,no_goals
+    
+    
+    def getWithdrawfee(self,request,lang,userid,withdraw_amount,currency,_type):
+        amount = request.data["withdraw_amount"]
+        currency = request.data["currency"]
+        withdraw_amount = str(amount)
+        # _type = "account" | "mobilemoney"
+        r = requests.get("https://api.flutterwave.com/v3/transfers/fee?amount="+withdraw_amount+"&currency="+currency+"&type="+_type,auth=BearerAuth(BEARER)).json()
+        return r["data"][0]["fee"]
             
-            
+class BearerAuth(requests.auth.AuthBase):
+        
+    def __init__(self, token):
+        self.token = token
+    def __call__(self, r):
+        r.headers["authorization"] = "Bearer " + self.token
+        return r    
 class Networths:
     def __init__(self):
         self.help = Helper()
