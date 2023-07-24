@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from .v1.users.Users import Users
-from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths,BankTransactions, Subscriptions
+from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths,BankTransactions, Subscriptions, TransactionRef
 from django.contrib.auth.models import User
 from rave_python import Rave, RaveExceptions,Misc
 
@@ -18,6 +18,7 @@ DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
 DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
 SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
 SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
+
 _user = Users()
 _deposit = Deposits()
 _withdraw = Withdraws()
@@ -27,6 +28,7 @@ _riskprofile = RiskProfiles()
 _networth = Networths()
 _transaction = BankTransactions()
 _subscription = Subscriptions()
+_refs = TransactionRef
 class index(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -134,27 +136,19 @@ class MakeDeposit(APIView):
                 'success': False
             })
         else:
-            rave = Rave(DEPOSIT_PUB_KEY,DEPOSIT_SEC_KEY, usingEnv = False)
-            try:
-                res = rave.Card.verify(txRef)
-                print(res["transactionComplete"])
-            except RaveExceptions.TransactionVerificationError as e:
-                print(e.err["errMsg"])
-                print(e.err["txRef"])
-                if e:
+            transaction_id = str(reference_id)
+            verified = _deposit.verifyTransaction(transaction_id)
+            if verified == "success":
+                txRef = _refs.getTxRef()
+                tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
+                if tx_ref == None:
+                    deposit = _deposit.createDeposit(request, lang, user,txRef)
+                    return Response(deposit)
+                if tx_ref["success"] == True:
                     return Response({
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
-            tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
-            if tx_ref["success"] == True:
-                return Response({
-                        'message': "Something went wrong. Deposit unsuccessful",
-                        'success': False
-                    })
-            else:
-                deposit = _deposit.createDeposit(request, lang, user)
-                return Response(deposit)
 
 class MakeDepositToBank(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
@@ -248,6 +242,7 @@ class MakeDepositToBank(APIView):
                 "phonenumber": user["profile"]["phoneno"],
                 "firstname": user["first_name"],
                 "lastname": user["last_name"],
+                "tx_ref":"MC-3243e",
                 "IP": "355426087298442",
             }
             try:
@@ -264,7 +259,7 @@ class MakeDepositToBank(APIView):
                 res = rave.Card.charge(payload)
 
                 if res["validationRequired"]:
-                    rave.Card.validate(res["flwRef"], "")
+                    rave.Card.validate(res["flwRef"], "12345")
 
                 transactions.append(res)
                 res = rave.Card.verify(res["txRef"])
@@ -281,7 +276,10 @@ class MakeDepositToBank(APIView):
             except RaveExceptions.TransactionVerificationError as e:
                 print(e.err["errMsg"])
                 print(e.err["txRef"])
-            # deposit = _deposit.createDeposit(request, lang, user)
+            # reference = transactions[0]["flwRef"]
+            # txRef = transactions[0]["txRef"]
+            # reference_id = payload["tx_ref"]
+            # deposit = _deposit.createDeposit(request, lang, user,reference,reference_id,txRef)
             return Response(transactions)
 
 
@@ -722,7 +720,7 @@ class MakeWithdrawFromBank(APIView):
             })
         else:
             if is_verified is False:
-                if is_subscribed["status"] != "subscribed":
+                if is_subscribed["status"] == "subscribed":
                     _type = ""
                     if withdraw_channel == "bank":
                         _type = "account"
@@ -735,13 +733,13 @@ class MakeWithdrawFromBank(APIView):
                         rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
 
                         res = rave.Transfer.initiate({
-                    "account_bank": account_bank,
-                    "account_number": account_number,
-                    "amount": total_withdraw,
-                    "narration": narration,
-                    "currency": currency,
-                    "beneficiary_name": beneficiary_name
-                    })
+                            "account_bank": account_bank,
+                            "account_number": account_number,
+                            "amount": total_withdraw,
+                            "narration": narration,
+                            "currency": currency,
+                            "beneficiary_name": beneficiary_name
+                        })
                         transactions.append(res)
                         print(res)
 
@@ -1157,6 +1155,18 @@ class GetWithdrawsByAuthUser(APIView):
         withdraw = _withdraw.getAllWithdraws(request,lang,user)
         return Response(withdraw)
     
+class GetTotalWithdrawByAuthUser(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang):
+        userid = request.user.id
+        user = _user.getAuthUserById(request, lang, userid)
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraw = _withdraw.getAllTotalWithdraws(request,lang,user)
+        return Response(withdraw)
+    
 class GetPendingWithdrawsByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -1233,7 +1243,7 @@ class Subscribe(APIView):
         user = _user.getAuthUser(request,lang)
         userid = user["user_id"]
         reference = request.data["reference"]
-        referenceid = request.data["reference_id"]
+        reference_id = request.data["reference_id"]
         amount = request.data["amount"]
         lang = DEFAULT_LANG if lang == None else lang
         txRef = request.data["tx_ref"]
@@ -1243,7 +1253,7 @@ class Subscribe(APIView):
                 "success": False,
                 "type": "txRef"
             })
-        elif not referenceid:
+        elif not reference_id:
             return Response({
                 "message": "This field is required",
                 "success": False,
@@ -1262,25 +1272,7 @@ class Subscribe(APIView):
                 "type": "amount"
             })
         else:
-            # rave = Rave("FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X", "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X", usingEnv = False)
-            rave = Rave(SUB_PUB_KEY, SUB_SEC_KEY, usingEnv = False)
-            try:
-                res = rave.Card.verify(txRef)
-                print(res["transactionComplete"])
-            except RaveExceptions.TransactionVerificationError as e:
-                print(e.err["errMsg"])
-                print(e.err["txRef"])
-                if e:
-                    return Response({
-                        'message': "Something went wrong. Subscription unsuccessful - e",
-                        'success': False
-                    })
-            tx_ref = _subscription.getTxRefById(request,lang,user,txRef)
-            if tx_ref["success"] == True:
-                return Response({
-                        'message': "Something went wrong. Subscription unsuccessful - tx",
-                        'success': False
-                    })
-            else:
-                subscribe = _subscription.subscribe(request,lang,userid)
-                return Response(subscribe)
+            txRef = _refs.getTxRef()
+            print(txRef)
+            subscribe = _subscription.subscribe(request,lang,userid,txRef)
+            return Response(subscribe)

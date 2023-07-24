@@ -123,7 +123,7 @@ class RiskProfile(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     score = models.IntegerField(verbose_name="score", default=0)
     risk_analysis = models.CharField(max_length=200, verbose_name="analysis",default="Incomplete Risk profile")
-    investment_option = models.CharField(max_length=200,verbose_name="investment option", default="Tbills")
+    investment_option = models.CharField(max_length=200,verbose_name="investment option", default="Cash | Venture | Credit")
     is_complete = models.BooleanField(default=False, verbose_name="status")
     
     def __str__(self):
@@ -397,7 +397,7 @@ class Deposit(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     reference = models.CharField(max_length=200,default="")
     reference_id = models.IntegerField(default=0)
-    txRef = models.IntegerField(default=0)
+    txRef = models.CharField(max_length=200)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.deposit_amount)
@@ -436,7 +436,7 @@ class Subscription(models.Model):
     amount = models.BigIntegerField(default=0)
     currency = models.CharField(max_length=200, default='UGX')
     created = models.DateTimeField(auto_now_add=True)
-    txRef = models.IntegerField(default=0)
+    txRef = models.CharField(max_length=200)
     
     def __str__(self):
         return "%s" % self.is_subscribed

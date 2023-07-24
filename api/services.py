@@ -5,14 +5,25 @@ from .helper.helper import Helper
 from .v1.locale import Locale
 from django.contrib.auth.models import User
 import requests
+import uuid
 
-BEARER = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
+BEARER_INVESTORS = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
+BEARER_SAVERS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'
 
 
 _helper = Helper()
+
+class TransactionRef:
+    def getTxRef():
+        txRef = str(uuid.uuid4())
+        return txRef
 class Subscriptions:
     def __init__(self):
         self.help = Helper()
+        
+    def verifyTransaction(self,transaction_id):
+        r = requests.get("https://api.flutterwave.com/v3/transactions/"+transaction_id+"/verify",auth=BearerAuth(BEARER_SAVERS)).json()
+        return r["status"]
     
     def getSubscriptionStatus(self,request,lang,userid):
         # account creation date
@@ -58,37 +69,13 @@ class Subscriptions:
                         "days_passed":time
                     }
     
-    
-    def getTxRefById(self,request,lang,user,txRef):
-        tx_ref = 0
-        userid = request.user.id
-        subscriptions = Subscription.objects.filter(user_id=userid)
-        if subscriptions.exists():
-            for subscription in subscriptions:
-                tx_ref = subscription.txRef
-                if tx_ref == txRef:
-                    return {
-                        "message":"txRef matches",
-                        "success": True
-                    }
-                else:
-                    return {
-                        "message":"No subscriptions found for your account",
-                        "success": False
-                    }
-        else:
-            return {
-                "message":"No subscriptions found for your account",
-                "success": False
-            }
-    
-    def subscribe(self,request,lang,userid):
+    def subscribe(self,request,lang,userid,txRef):
         days_left = self.getSubscriptionStatus(request,lang,userid)
         days_remaining = days_left["days_passed"]
         created = datetime.datetime.now()
         reference = request.data["reference"]
         referenceid = request.data["reference_id"]
-        txRef = request.data["tx_ref"]
+        txRef = txRef
         amount = 20500
         currency = "UGX"
         # lets make sure the user pays the right amount
@@ -200,22 +187,22 @@ class Deposits:
                 "0"
             }
             
+    def verifyTransaction(self,transaction_id):
+        r = requests.get("https://api.flutterwave.com/v3/transactions/"+transaction_id+"/verify",auth=BearerAuth(BEARER_INVESTORS)).json()
+        return r["status"]
+            
     def getTxRefById(self,request,lang,user,txRef):
-        tx_ref = 0
         userid = request.user.id
         ddeposits = Deposit.objects.filter(user_id=userid)
         if ddeposits.exists():
             for deposit in ddeposits:
                 tx_ref = deposit.txRef
-                if tx_ref == txRef:
+                txref = str(txRef)
+                print(txref,tx_ref)
+                if txref == tx_ref:
                     return {
                         "message":"txRef matches",
                         "success": True
-                    }
-                else:
-                    return {
-                        "message":"No deposits found for your account",
-                        "success": False
                     }
         else:
             return {
@@ -334,7 +321,7 @@ class Deposits:
 
 
 
-    def createDeposit(self, request, lang, user):
+    def createDeposit(self, request, lang, user,txRef):
         current_datetime = datetime.datetime.now()
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
@@ -344,7 +331,7 @@ class Deposits:
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
-        txRef = request.data["tx_ref"]
+        txRef = txRef
         # get the user from Authorised user in token
         userid = request.user.id
         user_name = request.user.first_name
@@ -602,7 +589,10 @@ class RiskProfiles:
         qn11 = request.data["qn11"]
         score = request.data["score"]
         risk_analysis = request.data["risk_analysis"]
-        investment_option = request.data["investment_option"]
+        investmentOption = request.data["investment_option"]
+        investment_option = ""
+        if investmentOption == "":
+            investment_option = "Cash | Venture | Credit"
         # check for exisiting risk profile for the user
         rriskprofile = RiskProfile.objects.filter(user_id=userid)
         if rriskprofile.exists():
@@ -729,11 +719,13 @@ class Withdraws:
         
     def getAllWithdraws(self,request,lang,user):
         wwithdraws = []
+        total_withdraw = 0
         userid = request.user.id
         withdraws = Withdraw.objects.filter(user_id=userid)
         if withdraws.exists:
             for withdraw in withdraws:
                 withdrawid = withdraw.pk
+                total_withdraw+=withdraw.withdraw_amount
                 wwithdraws.append({
                     "withdarw_id": withdrawid,
                     "withdraw_channel":withdraw.withdraw_channel,
@@ -744,6 +736,17 @@ class Withdraws:
                     "created":withdraw.created
                 })
             return wwithdraws
+        else:
+            return 0
+    
+    def getAllTotalWithdraws(self,request,lang,user):
+        total_withdraw = 0
+        userid = request.user.id
+        withdraws = Withdraw.objects.filter(user_id=userid)
+        if withdraws.exists:
+            for withdraw in withdraws:
+                total_withdraw+=withdraw.withdraw_amount
+            return total_withdraw
         else:
             return 0
         
