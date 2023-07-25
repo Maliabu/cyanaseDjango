@@ -260,7 +260,7 @@ class Deposits:
         # deposits.sort(reverse=True)
         return totalDepositUGX,totalDepositUSD,totalUGX,totalUSD,depo,dates,deposits,goalDepositsUGX
     
-    def depositToGoal(self,request,lang,user,goalid):
+    def depositToGoal(self,request,lang,user,goalid,txRef):
         current_datetime = datetime.datetime.now()
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
@@ -270,7 +270,7 @@ class Deposits:
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
-        txRef = request.data["tx_ref"]
+        txRef = txRef
         # get the user from Authorised user in token
         userid = request.user.id
         user_name = request.user.first_name
@@ -872,7 +872,7 @@ class Withdraws:
         currency = request.data["currency"]
         withdraw_amount = str(amount)
         # _type = "account" | "mobilemoney"
-        r = requests.get("https://api.flutterwave.com/v3/transfers/fee?amount="+withdraw_amount+"&currency="+currency+"&type="+_type,auth=BearerAuth(BEARER)).json()
+        r = requests.get("https://api.flutterwave.com/v3/transfers/fee?amount="+withdraw_amount+"&currency="+currency+"&type="+_type,auth=BearerAuth(BEARER_INVESTORS)).json()
         return r["data"][0]["fee"]
             
 class BearerAuth(requests.auth.AuthBase):

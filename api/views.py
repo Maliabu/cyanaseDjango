@@ -288,31 +288,24 @@ class MakeDepositToGoal(APIView):
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
 
-    def post(self, request, lang,*args, **kwargs):
+    def post(self, request, lang, *args, **kwargs):
         lang = DEFAULT_LANG if lang == None else lang
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
         deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
-        account_type = request.data["account_type"]
-        goalid = request.data["goal_id"]
         investment_option = request.data["investment_option"]
-        cardno = request.data["cardno"]
-        cvv = request.data["cvv"]
-        expirymonth = request.data["expirymonth"]
-        expiryyear = request.data["expiryyear"]
+        account_type = request.data["account_type"]
+        reference = request.data["reference"]
+        reference_id = request.data["reference_id"]
+        txRef = request.data["tx_ref"]
+        goalid = request.data["goal_id"]
         user = _user.getAuthUser(request, lang)
         ##########################
         if not payment_means:
             return Response({
                 'message': "This field is required",
                 "type": "payment_means",
-                'success': False
-            })
-        elif not investment_option:
-            return Response({
-                'message': "This field is required",
-                "type": "investment_option",
                 'success': False
             })
         elif not account_type:
@@ -327,6 +320,12 @@ class MakeDepositToGoal(APIView):
                 "type": "deposit_category",
                 'success': False
             })
+        elif not investment_option:
+            return Response({
+                'message': "This field is required",
+                "type": "investment_option",
+                'success': False
+            })
         elif not deposit_amount:
             return Response({
                 'message': "This field is required",
@@ -339,33 +338,38 @@ class MakeDepositToGoal(APIView):
                 "type": "currency",
                 'success': False
             })
-        elif not cardno:
+        elif not reference:
             return Response({
                 'message': "This field is required",
-                "type": "cardno",
+                "type": "reference",
                 'success': False
             })
-        elif not cvv:
+        elif not reference_id:
             return Response({
                 'message': "This field is required",
-                "type": "cvv",
+                "type": "reference_id",
                 'success': False
             })
-        elif not expirymonth:
+        elif not txRef:
             return Response({
                 'message': "This field is required",
-                "type": "expiry month",
-                'success': False
-            })
-        elif not expiryyear:
-            return Response({
-                'message': "This field is required",
-                "type": "expiry year",
+                "type": "txRef",
                 'success': False
             })
         else:
-            deposit = _deposit.depositToGoal(request, lang, user,goalid)
-            return Response(deposit)
+            transaction_id = str(reference_id)
+            verified = _deposit.verifyTransaction(transaction_id)
+            if verified == "success":
+                txRef = _refs.getTxRef()
+                tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
+                if tx_ref == None:
+                    deposit = _deposit.depositToGoal(request, lang, user,goalid,txRef)
+                    return Response(deposit)
+                if tx_ref["success"] == True:
+                    return Response({
+                        'message': "Something went wrong. Deposit unsuccessful",
+                        'success': False
+                    })
 
 class GetDepositsByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
@@ -428,6 +432,9 @@ class CreateGoal(APIView):
         deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
         account_type = request.data["account_type"]
+        reference = request.data["reference"]
+        reference_id = request.data["reference_id"]
+        txRef = request.data["tx_ref"]
         if not goal_name:
             return{
                 "message": "This field is required",
@@ -457,7 +464,7 @@ class CreateGoal(APIView):
                 'message': "This field is required",
                 "type": "payment_means",
                 'success': False
-            }, status=400)
+            })
         elif not account_type:
             return Response({
                 'message': "This field is required",
@@ -482,12 +489,41 @@ class CreateGoal(APIView):
                 "type": "currency",
                 'success': False
             })
+        elif not reference:
+                return Response({
+                'message': "This field is required",
+                "type": "reference",
+                'success': False
+            })
+        elif not reference_id:
+            return Response({
+                'message': "This field is required",
+                "type": "reference_id",
+                'success': False
+            })
+        elif not txRef:
+            return Response({
+                'message': "This field is required",
+                "type": "txRef",
+                'success': False
+            })
         else:
             goal = _goal.createGoal(request, lang,user)
             goalid = goal["goalid"]
-            deposit = _deposit.depositToGoal(request,lang,user,goalid)
-            return Response(goal)
-        
+            transaction_id = str(reference_id)
+            verified = _deposit.verifyTransaction(transaction_id)
+            if verified == "success":
+                txRef = _refs.getTxRef()
+                tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
+                if tx_ref == None:
+                    deposit = _deposit.depositToGoal(request, lang, user,goalid,txRef)
+                    return Response(goal)
+                if tx_ref["success"] == True:
+                    return Response({
+                        'message': "Something went wrong. Deposit unsuccessful",
+                        'success': False
+                    })
+
 class GetGoalsByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -844,7 +880,7 @@ class MakeGoalWithdrawFromBank(APIView):
             })
         else:
             if is_verified is False:
-                if is_subscribed["status"] != "subscribed":
+                if is_subscribed["status"] == "subscribed":
                     _type = ""
                     if withdraw_channel == "bank":
                         _type = "account"
