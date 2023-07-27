@@ -24,6 +24,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from . import views
+from .v1.uploading import UploadView
 import importlib
 
 DEFAULT_API_VERSION = "v1"
@@ -99,11 +100,13 @@ urlpatterns = [
          views.GetGoalNetworth.as_view(), name="get-user-networth"),
 #     path('<str:lang>/auth/user/bank/transfer/',
 #          views.BankTransfer.as_view(), name="get-transfer"),
-    path('<str:lang>/auth/user/profile/photo/',
-         upload.UploadPhoto.as_view(), name="upload-photo"),
+    path('<str:lang>/auth/user/upload/profile/photo/',
+         UploadView.UploadPhoto.as_view(), name="upload-photo"),
+    path('<str:lang>/auth/user/get/profile/photo/',
+         UploadView.GetProfilePhoto.as_view(), name="get-profile-photo"),
     path('<str:lang>/auth/user/update/password/',
          user_view.UpdateAuthUserPassword.as_view(), name="update-user-password"),
-    path('<str:lang>/email/verify/<str:userid>/?P',user_view.verifyAccount.as_view(),name = "verify-email"),
+     path('<str:lang>/email/verify/<str:userid>/',user_view.verifyAccount.as_view(),name = "email-verify"),
     path('<str:lang>/auth/user/delete/',user_view.DeleteUserAccount.as_view(),name = "delete-user-account")
 ]
 urlpatterns = urlpatterns + \

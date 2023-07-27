@@ -2,7 +2,7 @@ from django.shortcuts import render
 # Create your views here.
 from .Upload import Upload
 from django.shortcuts import render, HttpResponse
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -202,60 +202,21 @@ class UploadPhoto(APIView):
     http_method_names = ['post']
     
     def post(self,request,lang):
-        if request.FILES:
-            photo = request.FILES['photo']
-            
-            ##########################
-            if not request.POST['photo']:
-                return JsonResponse({"message": "Incomplete data request", "status": "failed"}, status=400)
-            
-            #######################################
-            image_path = f"media/"
-            # print(video_path)
-            if not os.path.exists(image_path):
-                os.mkdir(image_path)
-            ###################################
-            file_name, file_extension = os.path.splitext(photo.name)
-            #####################################
-            image_name = f"{photo}{file_extension}".strip()
-            # Upload image
-            output = f'{image_path}{image_name}'.strip()
-            #############################
-            if file_extension in webconfig.valid_image_extensions:
-                # upload file
-                _upload.upload(output, photo)
-                # Check if its the required image
-                img = Image.open(output)
-                width, height = img.size
-                img.close()
-                ###########################
-                if width >= webconfig.max_thumbnail_width and height >= webconfig.max_thumbnail_height:
-                    self.saveImageResolution(
-                        output, image_path, photo)
-                    sizes = webconfig.sizes
-                    ##########################################
-                    default_image_size = sizes[0]
-                    dwidth = default_image_size["width"]
-                    dheight = default_image_size["height"]
-                    default_profile_photo = f"{photo}_{dwidth}x{dheight}.jpg".strip()
-                   
-                    return JsonResponse({
-                        "image_id": photo,
-                        "image_id_encrypt": photo,
-                        "extension": file_extension,
-                        "original_image": default_profile_photo,
-                        "image_output_image": f"{webconfig.VIDEO_THUMBNAIL_ROOT}/{photo}/{default_profile_photo}",
-                        "message": "Uploaded photo successfully",
-                        "status": "success"}, status=200)
-                else:
-                    os.remove(output)
-                    return JsonResponse({"message": f"Invalid image size, your image must be atleast {webconfig.max_thumbnail_width}x{webconfig.max_thumbnail_height} not {width}x{height}", "status": "failed"}, status=400)
-            else:
-                valid_ext = ""
-                for ext in webconfig.valid_image_extensions:
-                    valid_ext += f"{ext}, ".replace(".", "")
-                valid_ext = valid_ext[:-2]
-                return JsonResponse({"message": f"Invalid image extension, We only support {valid_ext}", "status": "failed"}, status=400)
+        photo = request.data['photo']
+        if photo:
+            destination = 'static/photo.png'
+            _upload.upload(destination,photo)
+            return Response({"message": "Upload successful", "success": True})
         else:
-            return JsonResponse({"message": "Incomplete request data", "status": "failed"}, status=400)
+            return Response({"message": "Incomplete request data", "success": False})
     
+class GetProfilePhoto(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+    
+    def get(self,request,lang):
+        destination = 'static/photo.png'
+        response = FileResponse(open(destination, 'rb'), as_attachment=True, filename="profile_photo")
+        return response
+        # return FileResponse(open(destination, 'rb'))

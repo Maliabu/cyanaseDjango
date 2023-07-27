@@ -61,8 +61,12 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAdminUser'
+        'rest_framework.permissions.IsAdminUser',
     ),
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
 }
 
 MIDDLEWARE = [
@@ -176,7 +180,6 @@ STATICFILES_DIRS = [
   os.path.join(BASE_DIR, "static")
   
 ]
-
 STATIC_ROOT = os.path.join(BASE_DIR, 'assests')
 
 STATIC_ROOT_URL = os.path.join(BASE_DIR, 'static')

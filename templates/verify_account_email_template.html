@@ -1,10 +1,9 @@
 <div>
     {% autoescape off %}
-    <p>
-        Hello {{user.first_name}}, your account
-        verification code is </p>
-    <h1> {{verificationcode}} </h1>
-     <a href="http://localhost:8000/{% url "verify-email" user.user_id %}?code=verificationcode">
-    Please activate your account</a> 
+    <h6>
+        Hello {{user.first_name}}, this is your verification email from CYANASE INVESTORS LTD. </h6>
+    {% comment %} <h1> {{verificationcode}} </h1> {% endcomment %}
+     <a href="http://{{domain}}{% url 'verify-email' userid=user.user_id code=verificationcode %}">
+    Please click this link to activate your account</a> 
      {% endautoescape %} 
 </div>

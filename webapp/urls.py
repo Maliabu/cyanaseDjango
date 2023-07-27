@@ -3,8 +3,11 @@ from django.conf.urls.static import static
 from django.urls import path
 from . import views
 
+lang='en'
+
 urlpatterns = [
  path('', views.index, name="index"),
+ path('verify/email/<userid>/<code>/', views.get, name="verify-email"),
 ]
 urlpatterns = urlpatterns + \
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

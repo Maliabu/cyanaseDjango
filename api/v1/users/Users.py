@@ -23,6 +23,10 @@ import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from ...models import *
+from django.urls import resolve,reverse
+from django.contrib.sites.shortcuts import get_current_site
+from django.utils.http import urlsafe_base64_decode,urlsafe_base64_encode
+from django.utils.encoding import force_bytes,force_str,DjangoUnicodeDecodeError
 
 # master module class
 # master module class
@@ -301,8 +305,16 @@ class Users:
         # get Token
         #############
         user = self.getAuthUserById(request, lang, userid)
+        current_site = get_current_site(request)
+        print(current_site)
+        # user_id = urlsafe_base64_encode(force_bytes(userid))
+        # abslink = reverse('verify-email')
+        # new_userid = str(userid) 
+        # new_code = str(verificationcode)
+        # absurl = 'http://localhost:8000'+abslink+new_userid+'?code='+new_code
+        # absurl = http://localhost:8000/email/verify/80?code=478900
         ###############
-        content = self.mailer.getEMailTemplateContent("verify_account_email_template.html", {"user": user, "verificationcode": verificationcode})
+        content = self.mailer.getEMailTemplateContent("verify_account_email_template.html", {"user": user, "verificationcode": verificationcode, "domain":current_site})
         #######################################
         self.mailer.sendHTMLEmail(email, "Please verify your account", content)
         return {

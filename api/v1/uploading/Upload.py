@@ -25,5 +25,10 @@ class Upload:
         for chunk in file.chunks():
             destination.write(chunk)
         destination.close()
+        
+    def getUploadedPhoto(self, output):
+        photo = open(output, 'rb')
+        print(photo)
+        
     ##################33
  
