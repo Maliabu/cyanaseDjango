@@ -4,10 +4,11 @@ from django.urls import path
 from . import views
 
 lang='en'
-
+#############################
 urlpatterns = [
  path('', views.index, name="index"),
- path('verify/email/<userid>/<code>/', views.get, name="verify-email"),
+ path('accounts/verify/', views.VerifyAccount, name="verify-account"),
 ]
+#############################
 urlpatterns = urlpatterns + \
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

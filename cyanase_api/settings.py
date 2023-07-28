@@ -112,8 +112,8 @@ EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 EMAIL_HOST_USER = "support@cyanase.com" #sender's email-id
 EMAIL_HOST_PASSWORD = "support@cyanase" #password associated with above email-id
-# Database
-# https://docs.djangoproject.com/en/4.1/ref/settings/#databases
+# # Database
+# # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
     'default': {

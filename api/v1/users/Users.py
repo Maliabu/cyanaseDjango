@@ -27,7 +27,7 @@ from django.urls import resolve,reverse
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.http import urlsafe_base64_decode,urlsafe_base64_encode
 from django.utils.encoding import force_bytes,force_str,DjangoUnicodeDecodeError
-
+from api.helper.Cryptor import Cryptor
 # master module class
 # master module class
 class Users:
@@ -35,6 +35,7 @@ class Users:
         self.help = helper.Helper()
         self.locale = Locale()
         self.mailer = Mailer()
+        self.cryptor = Cryptor()
 
     def getAuthUser(self, request, lang):
         userid = Token.objects.get(key=request.auth).user_id
@@ -306,22 +307,17 @@ class Users:
         #############
         user = self.getAuthUserById(request, lang, userid)
         current_site = get_current_site(request)
-        print(current_site)
-        # user_id = urlsafe_base64_encode(force_bytes(userid))
-        # abslink = reverse('verify-email')
-        # new_userid = str(userid) 
-        # new_code = str(verificationcode)
-        # absurl = 'http://localhost:8000'+abslink+new_userid+'?code='+new_code
-        # absurl = http://localhost:8000/email/verify/80?code=478900
         ###############
-        content = self.mailer.getEMailTemplateContent("verify_account_email_template.html", {"user": user, "verificationcode": verificationcode, "domain":current_site})
+        encrypted_verification_code = self.cryptor.encrypt(verificationcode)
+        encrypted_userid = self.cryptor.encrypt(userid)
+        content = self.mailer.getEMailTemplateContent("verify_account_email_template.html", {"user": user, "encrypted_verification_code": encrypted_verification_code, "encrypted_userid": encrypted_userid, "verificationcode": verificationcode, "domain":current_site})
         #######################################
         self.mailer.sendHTMLEmail(email, "Please verify your account", content)
         return {
                 "message": f"Your Account has been created successfuly, please take time and verify it with the link sent to {email} or use verification code {verificationcode}",
                 "success": True,
                 "user": user,
-                "verificationcode":verificationcode
+                "verificationcode": verificationcode
             }
 
     def UpdateUserPhoneNumber(self, request, lang, userid, phone_number):
