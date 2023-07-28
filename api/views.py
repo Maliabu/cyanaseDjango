@@ -141,11 +141,16 @@ class MakeDeposit(APIView):
             if verified == "success":
                 txRef = _refs.getTxRef()
                 tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
-                if tx_ref == None:
+                if tx_ref["success"] == False:
                     deposit = _deposit.createDeposit(request, lang, user,txRef)
                     return Response(deposit)
                 if tx_ref["success"] == True:
                     return Response({
+                        'message': "Something went wrong. Deposit unsuccessful",
+                        'success': False
+                    })
+            else:
+                return Response({
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
@@ -362,11 +367,16 @@ class MakeDepositToGoal(APIView):
             if verified == "success":
                 txRef = _refs.getTxRef()
                 tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
-                if tx_ref == None:
+                if tx_ref["success"] == False:
                     deposit = _deposit.depositToGoal(request, lang, user,goalid,txRef)
                     return Response(deposit)
                 if tx_ref["success"] == True:
                     return Response({
+                        'message': "Something went wrong. Deposit unsuccessful",
+                        'success': False
+                    })
+            else:
+                return Response({
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
@@ -515,12 +525,17 @@ class CreateGoal(APIView):
             if verified == "success":
                 txRef = _refs.getTxRef()
                 tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
-                if tx_ref == None:
+                if tx_ref["success"] == False:
                     deposit = _deposit.depositToGoal(request, lang, user,goalid,txRef)
                     return Response(goal)
                 if tx_ref["success"] == True:
                     return Response({
-                        'message': "Something went wrong. Deposit unsuccessful",
+                        'message': "Something went wrong. Goal not created",
+                        'success': False
+                    })
+            else:
+                return Response({
+                        'message': "Something went wrong. Goal not created",
                         'success': False
                     })
 
@@ -799,8 +814,12 @@ class MakeWithdrawFromBank(APIView):
                         withdraw = _withdraw.withdraw(request,lang,user,transactionid)
                         return Response(withdraw)
                 else:
+                    substatus = is_subscribed["status"]
+                    time_left = is_subscribed["days_passed"]
+                    print(substatus)
+                    print(time_left)
                     return Response({
-                        "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
+                        "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
                         "success": False
                     })
             else:
@@ -881,50 +900,62 @@ class MakeGoalWithdrawFromBank(APIView):
         else:
             if is_verified is False:
                 if is_subscribed["status"] == "subscribed":
-                    _type = ""
-                    if withdraw_channel == "bank":
-                        _type = "account"
-                    if withdraw_channel == "mobile money":
-                        _type = "mobilemoney"
-                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
-                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
-                    transactions = []
-                    try:
-                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+                    # check goal status
+                    goal_status = _goal.getGoalById(request,lang,goalid)
+                    if goal_status["is_active"] == False:
+                        _type = ""
+                        if withdraw_channel == "bank":
+                            _type = "account"
+                        if withdraw_channel == "mobile money":
+                            _type = "mobilemoney"
+                        getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                        total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+                        transactions = []
+                        try:
+                            rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
 
-                        res = rave.Transfer.initiate({
-                    "account_bank": account_bank,
-                    "account_number": account_number,
-                    "amount": total_withdraw,
-                    "narration": narration,
-                    "currency": currency,
-                    "beneficiary_name": beneficiary_name
-                    })
-                        transactions.append(res)
-                        print(res)
+                            res = rave.Transfer.initiate({
+                                "account_bank": account_bank,
+                                "account_number": account_number,
+                                "amount": total_withdraw,
+                                "narration": narration,
+                                "currency": currency,
+                                "beneficiary_name": beneficiary_name
+                            })
+                            transactions.append(res)
+                            print(res)
 
-                        balanceres = rave.Transfer.getBalance("UGX")
-                        print(balanceres)
+                            balanceres = rave.Transfer.getBalance("UGX")
+                            print(balanceres)
 
-                    except RaveExceptions.IncompletePaymentDetailsError as e:
-                        print(e)
+                        except RaveExceptions.IncompletePaymentDetailsError as e:
+                            print(e)
 
-                    except RaveExceptions.InitiateTransferError as e:
-                        print(e.err)
+                        except RaveExceptions.InitiateTransferError as e:
+                            print(e.err)
 
-                    except RaveExceptions.TransferFetchError as e:
-                        print(e.err)
+                        except RaveExceptions.TransferFetchError as e:
+                            print(e.err)
 
-                    except RaveExceptions.ServerError as e:
-                        print(e.err)
-                    if transactions[0]["error"] is False:
-                        transaction = _transaction.createTransfer(request,lang,transactions)
-                        transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdrawFromGoal(request,lang,goalid,user,transactionid)
-                        return Response(withdraw)
+                        except RaveExceptions.ServerError as e:
+                            print(e.err)
+                        if transactions[0]["error"] is False:
+                            transaction = _transaction.createTransfer(request,lang,transactions)
+                            transactionid = transaction["transaction_id"]
+                            withdraw = _withdraw.withdrawFromGoal(request,lang,goalid,user,transactionid)
+                            return Response(withdraw)
+                    elif goal_status["is_active"] == True:
+                        return Response({
+                            "message":"This goal is done.",
+                            "success":False
+                        })
                 else:
+                    substatus = is_subscribed["status"]
+                    time_left = is_subscribed["days_passed"]
+                    print(substatus)
+                    print(time_left)
                     return Response({
-                        "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
+                        "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
                         "success": False
                     })
             else:

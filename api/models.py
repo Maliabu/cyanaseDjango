@@ -379,6 +379,7 @@ class Goal(models.Model):
     goal_amount = models.BigIntegerField(default=0)
     deposit_type = models.CharField(max_length=200, null=True)
     deposit_reminder_day = models.CharField(max_length=200, null=True)
+    is_active = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

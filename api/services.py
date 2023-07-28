@@ -44,28 +44,28 @@ class Subscriptions:
                     }
                 elif subscription.is_subscribed == False and subscription.days_left < 30:
                     return{
-                        "status":"pending subscription",
+                        "status":"pending",
                         "days_passed":time
                     }
                 elif subscription.is_subscribed == False and subscription.days_left > 30:
                     return{
-                        "status":"subscription overdue",
+                        "status":"overdue",
                         "days_passed":time
                     }
                 else:
                     return{
-                        "status":"pending subscription",
+                        "status":"pending",
                         "days_passed":time
                     }
         else:
             if time < 30:
                 return{
-                        "status":"pending subscription",
+                        "status":"pending",
                         "days_passed":time
                     }
             else:
                 return{
-                        "status":"subscription overdue",
+                        "status":"overdue",
                         "days_passed":time
                     }
     
@@ -189,6 +189,7 @@ class Deposits:
             
     def verifyTransaction(self,transaction_id):
         r = requests.get("https://api.flutterwave.com/v3/transactions/"+transaction_id+"/verify",auth=BearerAuth(BEARER_INVESTORS)).json()
+        print(r["status"])
         return r["status"]
             
     def getTxRefById(self,request,lang,user,txRef):
@@ -200,11 +201,19 @@ class Deposits:
                 txref = str(txRef)
                 print(txref,tx_ref)
                 if txref == tx_ref:
+                    print("YES")
                     return {
                         "message":"txRef matches",
                         "success": True
                     }
+                else:
+                    print("NO")
+                    return {
+                        "message":"txRef doesnot match",
+                        "success": False
+                    }
         else:
+            print("NO")
             return {
                         "message":"No deposits found for your account",
                         "success": False
@@ -417,6 +426,7 @@ class Goals:
                 "goal_period": goal.goal_period,
                 "deposit_type": goal.deposit_type,
                 "deposit_reminder_day": goal.deposit_reminder_day,
+                "status": goal.is_active,
                 "created": goal.created
             }
         else:
@@ -590,9 +600,12 @@ class RiskProfiles:
         score = request.data["score"]
         risk_analysis = request.data["risk_analysis"]
         investmentOption = request.data["investment_option"]
+        print(investmentOption)
         investment_option = ""
         if investmentOption == "":
             investment_option = "Cash | Venture | Credit"
+        else:
+            investment_option = investmentOption
         # check for exisiting risk profile for the user
         rriskprofile = RiskProfile.objects.filter(user_id=userid)
         if rriskprofile.exists():
@@ -613,22 +626,22 @@ class RiskProfiles:
                 risk_analysis = risk_analysis
             )
             for rrisk_profile in rriskprofile:
-                if rrisk_profile.risk_analysis != "Incomplete Risk Profile":
-                    rrisk_profile.is_complete is True
+                if rrisk_profile.risk_analysis == "Incomplete Risk Profile":
+                    rrisk_profile.is_complete = False
+                    return {
+                        "message": "risk profile is incomplete",
+                        "success": False,
+                        "riskprofile_id":rrisk_profile.id,
+                        "status": rrisk_profile.is_complete
+                    }
+                elif rrisk_profile.risk_analysis == "Complete":
+                    rrisk_profile.is_complete = True
                     return {
                         "message": "risk profile updated successfully",
                         "success": True,
                         "riskprofile_id":rrisk_profile.id,
                         "status": rrisk_profile.is_complete
-                    }
-                else:
-                    rrisk_profile.is_complete is False
-                    return {
-                        "message": "risk profile updated successfully",
-                        "success": True,
-                        "riskprofile_id":rrisk_profile.id,
-                        "status": rrisk_profile.is_complete
-                    }
+                }
         else:
             # create the risk profile
             riskprofile = RiskProfile.objects.create(
@@ -697,7 +710,7 @@ class Withdraws:
         status = "pending"
         withdraw = Withdraw.objects.create(
                     withdraw_channel=withdraw_channel,
-                    withdraw_amount=withdraw_amount,
+                    withdraw_amount=float(withdraw_amount),
                     currency=currency,
                     account_type=account_type,
                     user=User(pk=int(userid)),
