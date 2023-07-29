@@ -106,21 +106,13 @@ ASGI_APPLICATION = "cyanase_api.asgi.application"
 
 
 
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'mail.cyanase.com'
-# EMAIL_USE_TLS = True
-# EMAIL_PORT = 587
-# EMAIL_HOST_USER = "support@cyanase.com" #sender's email-id
-# EMAIL_HOST_PASSWORD = "support@cyanase" #password associated with above email-id
-
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "mail.iwatchtms.com"
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'mail.cyanase.com'
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
-EMAIL_HOST_USER = "no-reply@iwatchtms.com"  # sender's email-id
-EMAIL_HOST_PASSWORD = (
-    "T78P5v8qzMSpkBSKG_JepA"  # password associated with above email-id
-)
+EMAIL_HOST_USER = "support@cyanase.com" #sender's email-id
+EMAIL_HOST_PASSWORD = "support@cyanase" #password associated with above email-id
+
 
 # # Database
 # # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
