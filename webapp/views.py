@@ -6,52 +6,61 @@ from rest_framework.decorators import api_view, renderer_classes
 from rest_framework.renderers import TemplateHTMLRenderer
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 # from django.utils.encoding import force_bytes, force_str, force_text, DjangoUnicodeDecodeError
+from django.shortcuts import render, redirect, HttpResponse
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import messages
+from api.helper.Cryptor import Cryptor
 # from .utils import generate_token
 # from .models import User
 ## users
+_cryptor = Cryptor()
 DEFAULT_LANG = 'en'
 _user = Users()
  
 def index(request):
     return render(request, "index.html", {})
 
-def  VerifyAccount(request, userid):
-    if "code" in request.GET:
-        code = request.GET["code"]
-        return render(request, "verify-account.html", {})
+# def  VerifyAccount(request, userid):
+#     if "code" in request.GET:
+#         code = request.GET["code"]
+#         return render(request, "verify-account.html", {})
     
-@api_view(['GET'])
-@renderer_classes([TemplateHTMLRenderer])
-def get(request, userid, lang=DEFAULT_LANG):
-    if not str(userid):
-        print("NO USER ID")
-        return Response({"message": "Incomplete data request", "success": False}, template_name='verify-account.html')
-    if not ("code" in request.GET["code"]):
-        # 487092  
-        print("NO VERIFICATION CODE")
-        return Response({
-            'message': "Incomplete data request",
-            'success': False
-        }, template_name='verify-account.html')
-    elif not str(request.GET["code"]):
-        print("VERIFICATION CODE MUST BE A STRING")
-        return Response({"message": "Verification token is required", "success": False}, template_name='verify-account.html')
-    elif _user.isAccounVerifiedByID(request, lang, userid):
-        print("ACCOUNT ALREADY VERIFIED")
-        return Response({"message": "Account already verified", "success": True}, template_name='verify-account.html')
-    elif not _user.isVerificationTokenValid(request, lang, userid, request.GET["code"]):
-        print("INVALID VERIFICATION CODE")
-        return Response({"message": "Invalid verification code, either your code already expired or it is invalid, please resend verifiction code", "success": False}, template_name='verify-account.html')
-    else:
-        _user.VerifyAccount(request, lang, userid, request.GET["code"])
-        update = _user.updateUserVerificationToken(request, lang, userid)
-        if (update):
-            data = {"message": "Account verified successfuly", "success": True}
-            print("EVERYTHING IS JUUUUUUUST RIGHT")
-            return Response(data, template_name='verify-account.html')
 
+def VerifyAccount(request,):
+    lang = "en"
+    if not "verif" in request.GET or not "ref" in request.GET:
+        print("NO VERIF OR REF FOUND")
+        return render(request, 'verify-account.html', {
+            'message': "Invalid entry point",
+            'success': False
+        })
+    elif not str(request.GET["verif"]) or not str(request.GET["ref"]):
+        print("VERIF OR REF HAS NO CODE INSIDE")
+        return render(request, 'verify-account.html', {"message": "Invalid entry point", "success": False})
+    else:
+        try:
+            code = int(_cryptor.decrypt(request.GET["verif"]))
+            print("CODE: "+code) 
+            userid = int(_cryptor.decrypt(request.GET["ref"]))
+            ###################
+            if _user.isAccounVerifiedByID(request, lang, userid):
+                print("ALREADY VERIFIED")
+                return render(request, 'account-verified.html', {"message": "Account already verified", "success": True})
+            elif not _user.isVerificationTokenValid(request, lang, userid, code):
+                print("INVALID CODE")
+                return render(request, 'verify-account.html', {"message": "Invalid verification code, either your code already expired or it is invalid, please resend verifiction code", "success": False})
+            else: 
+                is_verified = _user.VerifyAccount(request, lang, userid, code)
+                print("STATUS UPDATED TO TRUE")
+                print(is_verified)
+                update = _user.updateUserVerificationToken(request, lang, userid)
+                if (update):
+                    return render(request, 'verify-account.html', {"message": "Account verified successfuly", "success": True})
+        except:
+            print("NOTHING HAPPENED")
+            return render(request, 'verify-account.html', {"message": "Invalid entry point", "success": False})
+            
 # def activate_user(request, uidb64, token):
     
 #     try:

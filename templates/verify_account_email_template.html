@@ -1,9 +1,9 @@
 <div>
     {% autoescape off %}
     <h6>
-        Hello {{user.first_name}}, this is your verification email from CYANASE INVESTORS LTD. </h6>
+        Hello {{ user.first_name }}, this is your verification email from CYANASE INVESTORS LTD. </h6>
     {% comment %} <h1> {{verificationcode}} </h1> {% endcomment %}
-     <a href="http://{{domain}}{% url 'verify-email' userid=user.user_id code=verificationcode %}">
+     <a href="http://127.0.0.1:8000/accounts/verify?ref={{ encrypted_verification_code }}&verif={{ encrypted_userid }}">
     Please click this link to activate your account</a> 
      {% endautoescape %} 
-</div>
+</div> <h1> {{ verificationcode }} </h1>
