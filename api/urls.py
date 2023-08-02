@@ -106,6 +106,8 @@ urlpatterns = [
          UploadView.GetProfilePhoto.as_view(), name="get-profile-photo"),
     path('<str:lang>/auth/user/update/password/',
          user_view.UpdateAuthUserPassword.as_view(), name="update-user-password"),
+    path('<str:lang>/password/reset/',
+         user_view.InitPasswordReset.as_view(), name="password-reset"),
      path('<str:lang>/email/verify/<str:userid>/',user_view.verifyAccount.as_view(),name = "email-verify"),
     path('<str:lang>/auth/user/delete/',user_view.DeleteUserAccount.as_view(),name = "delete-user-account")
 ]

@@ -1,7 +1,12 @@
 from django.shortcuts import render
+
 # Create your views here.
 from django.shortcuts import render, HttpResponse
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework.authentication import (
+    SessionAuthentication,
+    BasicAuthentication,
+    TokenAuthentication,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,7 +20,7 @@ from api.helper import helper
 from api.config import webconfig
 from api.v1.mailer.Mailer import Mailer
 from api.v1.locale.Locale import Locale
-from api.models import  *
+from api.models import *
 from django.db.models import Count
 from django.db.models import Q
 from django.contrib.auth.models import User
@@ -23,12 +28,13 @@ import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from ...models import *
-from django.urls import resolve,reverse
+from django.urls import resolve, reverse
 from django.contrib.sites.shortcuts import get_current_site
-from django.utils.http import urlsafe_base64_decode,urlsafe_base64_encode
-from django.utils.encoding import force_bytes,force_str,DjangoUnicodeDecodeError
-# from api.helper.Cryptor import Cryptor
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import force_bytes, force_str, DjangoUnicodeDecodeError
 from api.helper.Cryptor import Cryptor
+
+
 # master module class
 # master module class
 class Users:
@@ -43,122 +49,156 @@ class Users:
         user = User.objects.get(pk=userid)
         profile = UserProfile.objects.get(user=User(pk=userid))
         return {
-                'token': str(request.auth),  # None
-                "user_id": user.pk,
-                'username': user.username,  # `django.contrib.auth.User` instance.
-                'email': user.email,
-                'is_superuser': user.is_superuser,
-                "last_login" : user.last_login,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "profile":{
-                    "profile_id": user.pk,
-                    "country": profile.country,
-                    # "country":  None if profile.country == None else profile.country.pk,
-                    "language": None if profile.language == None else profile.language.pk,
-                    "time_zone": None if profile.tmz == None else profile.tmz.pk,
-                    "gender": profile.gender,
-                    "phoneno": profile.phoneno,
-                    "user_type":profile.user_type,
-                    "address": profile.address,
-                    "birth_date": profile.birth_date,
-                    "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
-                    "verification_code": profile.verification_code,
-                    "is_verified": profile.is_verified,
-                    "is_deletable": profile.is_verified,
-                    "is_disabled": profile.is_disabled,
-                    "created": profile.created
-                },
-                "is_staff": user.is_staff,
-                "is_active": user.is_active,
-                "date_joined": user.date_joined,
-                "message": "",
-                "success": True
-            }
-
+            "token": str(request.auth),  # None
+            "user_id": user.pk,
+            "username": user.username,  # `django.contrib.auth.User` instance.
+            "email": user.email,
+            "is_superuser": user.is_superuser,
+            "last_login": user.last_login,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "profile": {
+                "profile_id": user.pk,
+                "country": profile.country,
+                # "country":  None if profile.country == None else profile.country.pk,
+                "language": None if profile.language == None else profile.language.pk,
+                "time_zone": None if profile.tmz == None else profile.tmz.pk,
+                "gender": profile.gender,
+                "phoneno": profile.phoneno,
+                "user_type": profile.user_type,
+                "address": profile.address,
+                "birth_date": profile.birth_date,
+                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "verification_code": profile.verification_code,
+                "is_verified": profile.is_verified,
+                "is_deletable": profile.is_verified,
+                "is_disabled": profile.is_disabled,
+                "created": profile.created,
+            },
+            "is_staff": user.is_staff,
+            "is_active": user.is_active,
+            "date_joined": user.date_joined,
+            "message": "",
+            "success": True,
+        }
 
     def getAuthUserById(self, request, lang, userid):
-            user = User.objects.get(pk=userid)
-            profile = UserProfile.objects.get(user=User(pk=userid))
-            token, created = Token.objects.get_or_create(user=user)
-            return {
-                'token': str(token.key),  # None
-                "user_id": user.pk,
-                'username': user.username,  # `django.contrib.auth.User` instance.
-                'email': user.email,
-                'is_superuser': user.is_superuser,
-                "last_login" : user.last_login,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "profile":{
-                    "profile_id": user.pk,
-                    "country": profile.country,
-                    # "country":  None if profile.country == None else profile.country.pk,
-                    "language": None if profile.language == None else profile.language.pk,
-                    "time_zone": None if profile.tmz == None else profile.tmz.pk,
-                    "gender": profile.gender,
-                    "phoneno": profile.phoneno,
-                    "address": profile.address,
-                    "birth_date": profile.birth_date,
-                    "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
-                    "verification_code": profile.verification_code,
-                    "is_verified": profile.is_verified,
-                    "is_deletable": profile.is_verified,
-                    "is_disabled": profile.is_disabled,
-                    "created": profile.created
-                },
-                "is_staff": user.is_staff,
-                "is_active": user.is_active,
-                "date_joined": user.date_joined,
-                "message": "",
-                "success": True
-            }
+        user = User.objects.get(pk=userid)
+        profile = UserProfile.objects.get(user=User(pk=userid))
+        token, created = Token.objects.get_or_create(user=user)
+        return {
+            "token": str(token.key),  # None
+            "user_id": user.pk,
+            "username": user.username,  # `django.contrib.auth.User` instance.
+            "email": user.email,
+            "is_superuser": user.is_superuser,
+            "last_login": user.last_login,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "profile": {
+                "profile_id": user.pk,
+                "country": profile.country,
+                # "country":  None if profile.country == None else profile.country.pk,
+                "language": None if profile.language == None else profile.language.pk,
+                "time_zone": None if profile.tmz == None else profile.tmz.pk,
+                "gender": profile.gender,
+                "phoneno": profile.phoneno,
+                "address": profile.address,
+                "birth_date": profile.birth_date,
+                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "verification_code": profile.verification_code,
+                "is_verified": profile.is_verified,
+                "is_deletable": profile.is_verified,
+                "is_disabled": profile.is_disabled,
+                "created": profile.created,
+            },
+            "is_staff": user.is_staff,
+            "is_active": user.is_active,
+            "date_joined": user.date_joined,
+            "message": "",
+            "success": True,
+        }
 
     def getAuthUserByEmail(self, request, lang, email):
-            user = User.objects.get(email=email)
-            profile = UserProfile.objects.get(user=User(pk=user.pk))
-            return {
-                 'token': str(request.auth),  # None
-                 "user_id": user.pk,
-                'username': user.username,  # `django.contrib.auth.User` instance.
-                'email': user.email,
-                'is_superuser': user.is_superuser,
-                "last_login" : user.last_login,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "profile":{
-                    "profile_id": user.pk,
-                    "country": profile.country,
-                    # "country":  None if profile.country == None else profile.country.pk,
-                    "language": None if profile.language == None else profile.language.pk,
-                    "time_zone": None if profile.tmz == None else profile.tmz.pk,
-                    "gender": profile.gender,
-                    "phoneno": profile.phoneno,
-                    "address": profile.address,
-                    "birth_date": profile.birth_date,
-                    "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
-                    "verification_code": profile.verification_code,
-                    "is_verified": profile.is_verified,
-                    "is_deletable": profile.is_verified,
-                    "is_disabled": profile.is_disabled,
-                    "created": profile.created
-                },
-                "is_staff": user.is_staff,
-                "is_active": user.is_active,
-                "date_joined": user.date_joined,
-                "message": "",
-                "success": True
-            }
+        user = User.objects.get(email=email)
+        profile = UserProfile.objects.get(user=User(pk=user.pk))
+        return {
+            "token": str(request.auth),  # None
+            "user_id": user.pk,
+            "username": user.username,  # `django.contrib.auth.User` instance.
+            "email": user.email,
+            "is_superuser": user.is_superuser,
+            "last_login": user.last_login,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "profile": {
+                "profile_id": user.pk,
+                "country": profile.country,
+                # "country":  None if profile.country == None else profile.country.pk,
+                "language": None if profile.language == None else profile.language.pk,
+                "time_zone": None if profile.tmz == None else profile.tmz.pk,
+                "gender": profile.gender,
+                "phoneno": profile.phoneno,
+                "address": profile.address,
+                "birth_date": profile.birth_date,
+                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "verification_code": profile.verification_code,
+                "is_verified": profile.is_verified,
+                "is_deletable": profile.is_verified,
+                "is_disabled": profile.is_disabled,
+                "created": profile.created,
+            },
+            "is_staff": user.is_staff,
+            "is_active": user.is_active,
+            "date_joined": user.date_joined,
+            "message": "",
+            "success": True,
+        }
+        
+    def getAuthUserByEmailReset(self, request, lang, email):
+        user = User.objects.get(email=email)
+        profile = UserProfile.objects.get(user=User(pk=user.pk))
+        return {
+            # "token": str(request.auth),  # None
+            "user_id": user.pk,
+            "username": user.username,  # `django.contrib.auth.User` instance.
+            "email": user.email,
+            "is_superuser": user.is_superuser,
+            "last_login": user.last_login,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "profile": {
+                "profile_id": user.pk,
+                "country": profile.country,
+                # "country":  None if profile.country == None else profile.country.pk,
+                "language": None if profile.language == None else profile.language.pk,
+                "time_zone": None if profile.tmz == None else profile.tmz.pk,
+                "gender": profile.gender,
+                "phoneno": profile.phoneno,
+                "address": profile.address,
+                "birth_date": profile.birth_date,
+                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "verification_code": profile.verification_code,
+                "is_verified": profile.is_verified,
+                "is_deletable": profile.is_verified,
+                "is_disabled": profile.is_disabled,
+                "created": profile.created,
+            },
+            "is_staff": user.is_staff,
+            "is_active": user.is_active,
+            "date_joined": user.date_joined,
+            "message": "",
+            "success": True,
+        }
+
     def DirectLoginUser(self, request, lang, username):
         users = User.objects.filter(Q(username=username) | Q(email=username))
         if users.exists():
             user = users.get()
             return self.getAuthUserById(request, lang, user.pk)
         else:
-            return {
-              "message": "Invalid login credentials",
-               "success": False 
-            }
+            return {"message": "Invalid login credentials", "success": False}
+
     #########################################
     def getAllUsers(self, request, lang):
         results = []
@@ -167,72 +207,84 @@ class Users:
         for user in users:
             userid = user.pk
             profile = UserProfile.objects.get(user=User(pk=userid))
-            results.append({
-                'token': str(request.auth),  # None
-                "user_id": user.pk,
-                'username': user.username,  # `django.contrib.auth.User` instance.
-                'email': user.email,
-                'is_superuser': user.is_superuser,
-                "last_login" : user.last_login,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "profile":{
-                    "profile_id": user.pk,
-                    "country": profile.country,
-                    # "country":  None if profile.country == None else profile.country.pk,
-                    "language": None if profile.language == None else profile.language.pk,
-                    "time_zone": None if profile.tmz == None else profile.tmz.pk,
-                    "gender": profile.gender,
-                    "phoneno": profile.phoneno,
-                    "address": profile.address,
-                    "birth_date": profile.birth_date,
-                    "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
-                    "verification_code": profile.verification_code,
-                    "is_verified": profile.is_verified,
-                    "is_deletable": profile.is_verified,
-                    "is_disabled": profile.is_disabled,
-                    "created": profile.created
-                },
-                "is_staff": user.is_staff,
-                "is_active": user.is_active,
-                "date_joined": user.date_joined,
-                "message": "",
-                "success": True
-            })
+            results.append(
+                {
+                    "token": str(request.auth),  # None
+                    "user_id": user.pk,
+                    "username": user.username,  # `django.contrib.auth.User` instance.
+                    "email": user.email,
+                    "is_superuser": user.is_superuser,
+                    "last_login": user.last_login,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "profile": {
+                        "profile_id": user.pk,
+                        "country": profile.country,
+                        # "country":  None if profile.country == None else profile.country.pk,
+                        "language": None
+                        if profile.language == None
+                        else profile.language.pk,
+                        "time_zone": None if profile.tmz == None else profile.tmz.pk,
+                        "gender": profile.gender,
+                        "phoneno": profile.phoneno,
+                        "address": profile.address,
+                        "birth_date": profile.birth_date,
+                        "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                        "verification_code": profile.verification_code,
+                        "is_verified": profile.is_verified,
+                        "is_deletable": profile.is_verified,
+                        "is_disabled": profile.is_disabled,
+                        "created": profile.created,
+                    },
+                    "is_staff": user.is_staff,
+                    "is_active": user.is_active,
+                    "date_joined": user.date_joined,
+                    "message": "",
+                    "success": True,
+                }
+            )
         return results
 
-    #################################################     
-    def accountExists(self,  request, username, lang):
+    #################################################
+    def accountExists(self, request, username, lang):
         user = User.objects.filter(Q(username=username) | Q(email=username))
         if user.exists():
             return True
         else:
             return False
 
-    def userExistsById(self,  request, lang, id):
+    def userExistsById(self, request, lang, id):
         user = User.objects.filter(pk=int(id))
         if user.exists():
             return True
         else:
             return False
 
-
     def isVerificationTokenValid(self, request, lang, id, token):
-        user_prof = UserProfile.objects.filter(user=User(pk=int(id))).filter(verification_code=token)
+        print(token)
+        user_prof = UserProfile.objects.filter(user=User(pk=int(id))).filter(
+            verification_code=token
+        )
         if user_prof.exists():
             return True
         else:
             return False
 
     def isAccounVerified(self, request, lang, id, token):
-        user_prof = UserProfile.objects.filter(user=User(pk=int(id))).filter(verificationcode=token).filter(is_verified=True)
+        user_prof = (
+            UserProfile.objects.filter(user=User(pk=int(id)))
+            .filter(verification_code=token)
+            .filter(is_verified=True)
+        )
         if user_prof.exists():
             return True
         else:
             return False
-    
+
     def isAccounVerifiedByID(self, request, lang, userid):
-        user_prof = UserProfile.objects.filter(user=User(pk=userid)).filter(is_verified=True)
+        user_prof = UserProfile.objects.filter(user=User(pk=userid)).filter(
+            is_verified=True
+        )
         if user_prof.exists():
             return True
         else:
@@ -251,10 +303,9 @@ class Users:
             return True
         else:
             return False
-        
 
     def createAuthUser(self, request, lang):
-        current_datetime = datetime.datetime.now()  
+        current_datetime = datetime.datetime.now()
         allusers = User.objects.all().count()
         ##########################
         first_name = request.data["first_name"]
@@ -285,7 +336,7 @@ class Users:
         user = User.objects.create_user(username, email, password)
         user.first_name = first_name
         user.last_name = last_name
-        user.is_superuser=False
+        user.is_superuser = False
         user.is_staff = False
         user.is_active = True
         user.save()
@@ -300,7 +351,7 @@ class Users:
         # uuser.userprofile.country = None if not str(country) else SupportedCountry(pk=int(country))
         # uuser.userprofile.package = Package(pk=int(defaultpkgid))
         # uuser.userprofile.language = SupportedLanguage(pk=int(defaultlangid))
-        uuser.userprofile.verificationcode = verificationcode
+        uuser.userprofile.verification_code = verificationcode
         uuser.userprofile.profile_picture = profile_picture
         uuser.userprofile.last_modified = current_datetime
         uuser.save()
@@ -311,93 +362,145 @@ class Users:
         ###############
         encrypted_verification_code = self.cryptor.encrypt(verificationcode)
         encrypted_userid = self.cryptor.encrypt(userid)
-        content = self.mailer.getEMailTemplateContent("verify_account_email_template.html", {"user": user, "encrypted_verification_code": encrypted_verification_code, "encrypted_userid": encrypted_userid, "verificationcode": verificationcode, "domain":current_site})
+        content = self.mailer.getEMailTemplateContent(
+            "verify_account_email_template.html",
+            {
+                "user": user,
+                "encrypted_verification_code": encrypted_verification_code,
+                "encrypted_userid": encrypted_userid,
+                "verificationcode": verificationcode,
+                "domain": current_site,
+            },
+        )
         #######################################
         self.mailer.sendHTMLEmail(email, "Please verify your account", content)
         return {
-                "message": f"Your Account has been created successfuly, please take time and verify it with the link sent to {email} or use verification code {verificationcode}",
-                "success": True,
-                "user": user,
-                "verificationcode": verificationcode
-            }
+            "message": f"Your Account has been created successfuly, please take time and verify it with the link sent to {email} or use verification code {verificationcode}",
+            "success": True,
+            "user": user,
+            "verificationcode": verificationcode,
+        }
 
     def UpdateUserPhoneNumber(self, request, lang, userid, phone_number):
         UserProfile.objects.filter(user=User(pk=int(userid))).update(
-            phoneno = phone_number
+            phoneno=phone_number
         )
 
     def ResendVerificationCode(self, request, lang, email):
         verificationcode = str(self.help.getRandom())
         user = self.getAuthUserByEmail(request, lang, email)
         userid = user["user_id"]
-        verification_link = f"{webconfig.WEB_APP_URL}auth/{userid}/verify/?code={verificationcode}"
-        content = self.mailer.getEMailTemplateContent("verify_account_email_template.html", {"verification_link": verification_link, "user": user, "verificationcode": verificationcode})
+        verification_link = (
+            f"{webconfig.WEB_APP_URL}auth/{userid}/verify/?code={verificationcode}"
+        )
+        content = self.mailer.getEMailTemplateContent(
+            "verify_account_email_template.html",
+            {
+                "verification_link": verification_link,
+                "user": user,
+                "verificationcode": verificationcode,
+            },
+        )
         if self.mailer.sendHTMLEmail(email, "Please verify your account", content):
             user = UserProfile.objects.filter(user=User(pk=int(user["user_id"])))
             user.update(verificationcode=verificationcode)
             return {
                 "message": f"A verification code has been send to {email}, please check your inbox or spam emails",
-                "success": True
+                "success": True,
             }
         else:
             return {
                 "message": f"Something went wrong and we failed to send your emnail, please try again laiter",
-                "success": False
+                "success": False,
             }
 
     def InitPasswordReset(self, request, lang, email):
         verificationcode = str(self.help.getRandom())
         user = self.getAuthUserByEmail(request, lang, email)
         userid = user["user_id"]
-        reset_link = f"{webconfig.WEB_APP_URL}auth/{userid}/new-password/?code={verificationcode}"
-        content = self.mailer.getEMailTemplateContent("password_reset_email_template.html", {"reset_link":reset_link, "user": user, "verificationcode": verificationcode})
+        encrypted_verification_code = self.cryptor.encrypt(verificationcode)
+        encrypted_userid = self.cryptor.encrypt(userid)
+        content = self.mailer.getEMailTemplateContent(
+            "password_reset_email_template.html",
+            {
+                "user": user,
+                "encrypted_verification_code": encrypted_verification_code,
+                "encrypted_userid": encrypted_userid,
+                "email":email
+            },
+        )
         if self.mailer.sendHTMLEmail(email, "Password Reset", content):
-            self.updateUserVerificationToken(request, lang, int(user["user_id"]), verificationcode)
+            self.updateUserVerificationToken(
+                request, lang, int(user["user_id"]), verificationcode
+            )
             return {
                 "message": f"A password reset link and code has been sent to {email}, please check your Email inbox or spam",
-                "success": True
+                "success": True,
             }
         else:
             return {
                 "message": f"Something went wrong and we failed to send your email, please try again laiter",
-                "success": False
+                "success": False,
             }
 
     def updateUserVerificationToken(self, request, lang, userid, verificationcode=None):
-        verificationcode = str(self.help.getRandom()) if (verificationcode == None) else verificationcode
+        verificationcode = (
+            str(self.help.getRandom())
+            if (verificationcode == None)
+            else verificationcode
+        )
         user = UserProfile.objects.filter(user=User(pk=userid))
-        user.update(verificationcode=verificationcode)
+        user.update(verification_code=verificationcode)
 
     def VerifyAccount(self, request, lang, id, token):
-        UserProfile.objects.filter(user=User(pk=int(id))).filter(verificationcode=token).update(
-            is_verified = True
-        )
+        UserProfile.objects.filter(user=User(pk=int(id))).filter(
+            verification_code=token
+        ).update(is_verified=True)
         return True
 
-
     def UpdateAuthUser(self, request, lang, userid, data):
-        current_datetime = datetime.datetime.now()  
+        current_datetime = datetime.datetime.now()
         old_user = User.objects.filter(pk=userid).get()
         old_usergroup = UserGroup.objects.filter(user=User(pk=userid)).get()
-        #print(idzerofilling)
+        # print(idzerofilling)
         username = data["username"] if data["username"] else old_user.username
         first_name = data["first_name"] if data["first_name"] else old_user.first_name
         email = data["email"] if data["email"] else old_user.email
         last_name = data["last_name"] if data["last_name"] else old_user.last_name
         is_staff = data["is_staff"] if str(data["is_staff"]) else old_user.is_staff
-        is_superuser = data["is_superuser"] if str(data["is_superuser"]) else old_user.is_superuser
+        is_superuser = (
+            data["is_superuser"] if str(data["is_superuser"]) else old_user.is_superuser
+        )
         is_active = data["is_active"] if str(data["is_active"]) else old_user.is_active
         # PROFILE
         profile_id = data["profile_id"]
         gender = data["gender"] if data["gender"] else old_user.userprofile.gender
         phoneno = data["phoneno"] if data["phoneno"] else old_user.userprofile.phoneno
-        title = data["title"] if data["title"]  else old_user.userprofile.title
+        title = data["title"] if data["title"] else old_user.userprofile.title
         bio = data["bio"] if data["bio"] else old_user.userprofile.bio
-        location = data["location"] if data["location"] else old_user.userprofile.location
-        birth_date = data["birth_date"] if data["birth_date"] else old_user.userprofile.birth_date
-        profile_picture = data["profile_picture"] if data["profile_picture"] else old_user.userprofile.profile_picture
-        usignature = data["usignature"]if data["usignature"] else old_user.userprofile.usignature
-        security_group_id = data["security_group_id"] if str(data["security_group_id"]) else old_usergroup.security_group.pk
+        location = (
+            data["location"] if data["location"] else old_user.userprofile.location
+        )
+        birth_date = (
+            data["birth_date"]
+            if data["birth_date"]
+            else old_user.userprofile.birth_date
+        )
+        profile_picture = (
+            data["profile_picture"]
+            if data["profile_picture"]
+            else old_user.userprofile.profile_picture
+        )
+        usignature = (
+            data["usignature"]
+            if data["usignature"]
+            else old_user.userprofile.usignature
+        )
+        security_group_id = (
+            data["security_group_id"]
+            if str(data["security_group_id"])
+            else old_usergroup.security_group.pk
+        )
         uuser = User.objects.get(pk=userid)
         uuser.username = username
         uuser.first_name = first_name
@@ -405,7 +508,7 @@ class Users:
         uuser.last_name = last_name
         uuser.is_staff = is_staff
         uuser.is_superuser = is_superuser
-        uuser.is_active = is_active 
+        uuser.is_active = is_active
         uuser.userprofile.has_been_modified = True
         uuser.userprofile.gender = gender
         uuser.userprofile.phoneno = phoneno
@@ -420,22 +523,19 @@ class Users:
         usergroup = UserGroup.objects.filter(user=User(pk=userid))
         usergroup.update(
             security_group=SecurityGroup(pk=security_group_id),
-            has_been_modified = True,
-            last_modified = current_datetime
+            has_been_modified=True,
+            last_modified=current_datetime,
         )
         return True
 
     def UpdateAuthUserPassword(self, request, lang, password, userid):
         password = make_password(str(password))
         old_user = User.objects.filter(pk=userid)
-        old_user.update(
-            password = password
-        )
+        old_user.update(password=password)
         return True
-    
+
     def DeleteAccount(self, request, lang):
         userid = Token.objects.get(key=request.auth).user_id
         user = User.objects.get(pk=userid)
         user.delete()
         return True
-    

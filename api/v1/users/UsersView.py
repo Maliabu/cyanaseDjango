@@ -422,37 +422,56 @@ class verifyAccount(ObtainAuthToken):
             return Response({"message": "Account verified successfuly", "success": True}, status=200)
 
 
-# Generate custom AUTH Token
 class InitPasswordReset(ObtainAuthToken):
-    def get(self, request, lang, *args, **kwargs):
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
         lang = DEFAULT_LANG if lang == None else lang
-        if not ("email" in request.GET):
+        email = request.data["email"]
+        if not email:
             return Response({
                 'message': "Incomplete data request",
                 'success': False
-            }, status=400)
-        elif not request.GET["email"]:
-            return Response({
-                'message': "Email field is required",
-                'success': False
             })
-        elif not _helper.isEmailValid(request.GET["email"]):
-            return Response({
-                'message': "Invalid email address",
-                'success': False
-            })
-        elif not _user.emailExists(request, lang, request.GET["email"]):
-            return Response({
-                'message': f"Account with email {request.GET['email']} doesn't exist",
-                'success': False
-            }, status=400)
         else:
             response = _user.InitPasswordReset(
-                request, lang, request.GET["email"])
-            if response["success"]:
+                request, lang, email)
+            if response["success"]==True:
                 return Response(response)
             else:
-                return Response(response, status=400)
+                return Response(response)
+
+# Generate custom AUTH Token
+# class InitPasswordReset(ObtainAuthToken):
+#     def get(self, request, lang, *args, **kwargs):
+#         lang = DEFAULT_LANG if lang == None else lang
+#         if not ("email" in request.GET):
+#             return Response({
+#                 'message': "Incomplete data request",
+#                 'success': False
+#             }, status=400)
+#         elif not request.GET["email"]:
+#             return Response({
+#                 'message': "Email field is required",
+#                 'success': False
+#             })
+#         elif not _helper.isEmailValid(request.GET["email"]):
+#             return Response({
+#                 'message': "Invalid email address",
+#                 'success': False
+#             })
+#         elif not _user.emailExists(request, lang, request.GET["email"]):
+#             return Response({
+#                 'message': f"Account with email {request.GET['email']} doesn't exist",
+#                 'success': False
+#             }, status=400)
+#         else:
+#             response = _user.InitPasswordReset(
+#                 request, lang, request.GET["email"])
+#             if response["success"]:
+#                 return Response(response)
+#             else:
+#                 return Response(response, status=400)
 
 
 # Login User
@@ -460,7 +479,7 @@ class NewPasswordReset(ObtainAuthToken):
     def post(self, request, lang, userid):
         lang = DEFAULT_LANG if lang == None else lang
         if not str(userid):
-            return Response({"message": "Incomplete data request", "success": False}, status=400)
+            return Response({"message": "Incomplete data request", "success": False})
         #############################################
         data = request.data
         if data:

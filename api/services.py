@@ -289,7 +289,7 @@ class Deposits:
         # print(userid)
         # # create deposit
         account_type = AccountType.objects.filter(code_name=account_type).get()
-        if is_verified is False:
+        if is_verified is True:
         # # create deposit
             deposit = Deposit.objects.create(
                 deposit_amount=float(deposit_amount),
@@ -350,7 +350,7 @@ class Deposits:
         # # create deposit
         account_type = AccountType.objects.filter(code_name=account_type).get()
         # check if a user is verified to deposit
-        if is_verified is False:
+        if is_verified is True:
             deposit = Deposit.objects.create(
                 deposit_amount=float(request.data["deposit_amount"]),
                 payment_means=payment_means,
@@ -832,7 +832,7 @@ class Withdraws:
         account_type = AccountType.objects.filter(code_name=account_type).get()
         status = "pending"
         ## remember to verify the user
-        if is_verified is False:
+        if is_verified is True:
         # # create withdraw transaction
             withdraw = Withdraw.objects.create(
             withdraw_channel=withdraw_channel,

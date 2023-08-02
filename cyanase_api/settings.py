@@ -112,6 +112,8 @@ EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 EMAIL_HOST_USER = "support@cyanase.com" #sender's email-id
 EMAIL_HOST_PASSWORD = "support@cyanase" #password associated with above email-id
+
+
 # # Database
 # # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
@@ -188,3 +190,6 @@ MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 CORS_ORIGIN_ALLOW_ALL = True
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:3000',
+]

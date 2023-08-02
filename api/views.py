@@ -527,6 +527,7 @@ class CreateGoal(APIView):
                 tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
                 if tx_ref["success"] == False:
                     deposit = _deposit.depositToGoal(request, lang, user,goalid,txRef)
+                    print(deposit)
                     return Response(goal)
                 if tx_ref["success"] == True:
                     return Response({
@@ -770,7 +771,7 @@ class MakeWithdrawFromBank(APIView):
                 'success': False
             })
         else:
-            if is_verified is False:
+            if is_verified is True:
                 if is_subscribed["status"] == "subscribed":
                     _type = ""
                     if withdraw_channel == "bank":
@@ -898,7 +899,7 @@ class MakeGoalWithdrawFromBank(APIView):
                 'success': False
             })
         else:
-            if is_verified is False:
+            if is_verified is True:
                 if is_subscribed["status"] == "subscribed":
                     # check goal status
                     goal_status = _goal.getGoalById(request,lang,goalid)
@@ -1057,7 +1058,7 @@ class MakeWithdrawFromMobileMoney(APIView):
                 'success': False
             })
         else:
-            if is_verified is False:
+            if is_verified is True:
                 if is_subscribed["status"] != "subscribed":
                     _type = ""
                     if withdraw_channel == "bank":
@@ -1168,7 +1169,7 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                 'success': False
             })
         else:
-            if is_verified is False:
+            if is_verified is True:
                 if is_subscribed["status"] != "subscribed":
                     _type = ""
                     if withdraw_channel == "bank":

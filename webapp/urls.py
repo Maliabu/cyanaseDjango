@@ -8,6 +8,8 @@ lang='en'
 urlpatterns = [
  path('', views.index, name="index"),
  path('accounts/verify/', views.VerifyAccount, name="verify-account"),
+ path('reset/password/', views.ResetPassword, name="reset-password"),
+ path('params/', views.getParams, name="get-params"),
 ]
 #############################
 urlpatterns = urlpatterns + \
