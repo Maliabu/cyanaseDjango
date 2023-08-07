@@ -11,13 +11,15 @@ from .v1.users.Users import Users
 from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths,BankTransactions, Subscriptions, TransactionRef
 from django.contrib.auth.models import User
 from rave_python import Rave, RaveExceptions,Misc
+import os
 
 # Create your views here.
-DEFAULT_LANG = "en"
-DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
-DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
-SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
-SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
+
+DEFAULT_LANG = os.environ.get('DEFAULT_LANG')
+DEPOSIT_PUB_KEY = os.environ.get('DEPOSIT_PUB_KEY')
+DEPOSIT_SEC_KEY = os.environ.get('DEPOSIT_SEC_KEY')
+SUB_PUB_KEY = os.environ.get('SUB_PUB_KEY')
+SUB_SEC_KEY = os.environ.get('SUB_SEC_KEY')
 
 _user = Users()
 _deposit = Deposits()

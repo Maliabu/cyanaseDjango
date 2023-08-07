@@ -6,9 +6,10 @@ from .v1.locale import Locale
 from django.contrib.auth.models import User
 import requests
 import uuid
+import os
 
-BEARER_INVESTORS = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
-BEARER_SAVERS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'
+BEARER_INVESTORS = os.environ.get('BEARER_INVESTORS')
+BEARER_SAVERS = os.environ.get('BEARER_SAVERS')
 
 
 _helper = Helper()

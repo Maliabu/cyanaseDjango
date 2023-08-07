@@ -60,9 +60,7 @@ class UserType(models.Model):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    # user_type = models.ForeignKey(UserType, on_delete=models.CASCADE)
     user_type = models.CharField(max_length=200, default="personal", null=True)
-    # country = models.ForeignKey(SupportedCountry, on_delete=models.CASCADE, null=True, blank=True)
     country = models.CharField(max_length=200, default="uganda", null=True)
     language = models.ForeignKey(
         SupportedLanguage, on_delete=models.CASCADE, null=True, blank=True)

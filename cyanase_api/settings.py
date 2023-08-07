@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'django-insecure-rpo9pmgn%+1kn4n9xtz9l*3u(d-a)8p8pj*nlp3y!=pwwi*h(0'
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-rpo9pmgn%+1kn4n9xtz9l*3u(d-a)8p8pj*nlp3y!=pwwi*h(0')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
@@ -107,11 +107,11 @@ ASGI_APPLICATION = "cyanase_api.asgi.application"
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'mail.cyanase.com'
+EMAIL_HOST = os.environ.get('EAMIL_HOST')
 EMAIL_USE_TLS = True
-EMAIL_PORT = 587
-EMAIL_HOST_USER = "support@cyanase.com" #sender's email-id
-EMAIL_HOST_PASSWORD = "support@cyanase" #password associated with above email-id
+EMAIL_PORT = os.environ.get('EAMIL_PORT')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 
 # # Database
