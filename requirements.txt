@@ -1,5 +1,6 @@
 # pip install python-dateutil
 pycryptodomex
+pip install mysql-python
 # pip install pyyaml ua-parser user-agents
 # pip install django-user-agents
 acme==1.1.0
