@@ -539,3 +539,45 @@ class Users:
         user = User.objects.get(pk=userid)
         user.delete()
         return True
+    
+    def onboardUsers(self, request, lang,user):
+        current_datetime = user["profile"]["created"]
+        first_name = user["first_name"]
+        email = user["email"]
+        username = user["email"]
+        last_name = user["last_name"]
+        password = user["password"]
+        is_verified = user["profile"]["is_verified"]
+        gender = user["profile"]["gender"]
+        if gender == "M":
+            gender = "Male"
+        else:
+            gender = "Female"
+        birth_date = user["profile"]["birth_date"]
+        country = user["profile"]["country"]
+        gender = user["profile"]["gender"]
+        phoneno = user["profile"]["phoneno"]
+        profile_picture = "photo.png"
+        users = User.objects.create_user(username, email, password)
+        users.first_name = first_name
+        users.last_name = last_name
+        users.is_superuser = False
+        users.is_staff = False
+        users.is_active = False
+        users.save()
+        userid = users.pk
+        uuser = User.objects.get(pk=userid)
+        uuser.userprofile.gender = None if not gender else gender
+        uuser.userprofile.phoneno = None if not phoneno else phoneno
+        uuser.userprofile.birth_date = None if not birth_date else birth_date
+        uuser.userprofile.country = None if not country else country
+        uuser.userprofile.profile_picture = profile_picture
+        uuser.userprofile.last_modified = current_datetime
+        uuser.userprofile.is_verified = is_verified
+        uuser.save()
+        userss = self.getAuthUserById(request, lang, userid)
+        return {
+            "message": f"user has been added",
+            "success": True,
+            "user": userss
+        }

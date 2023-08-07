@@ -265,6 +265,7 @@ class Deposits:
             for amount in aamount:
                 depo.append({"name":item, "datas":amount.deposit_amount/1000,"date":amount.created.strftime("%d %b")})
                 dates.append(amount.created.strftime("%d %b"))
+                # dates.append((str(amount.created))[0:10])
         # myData = list({names["name"]:names for names in depo}.values())
         # deposits.sort(reverse=True)
         return totalDepositUGX,totalDepositUSD,totalUGX,totalUSD,depo,dates,deposits,goalDepositsUGX

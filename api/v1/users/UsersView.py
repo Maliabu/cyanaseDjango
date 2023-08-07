@@ -521,3 +521,34 @@ class NewPasswordReset(ObtainAuthToken):
                 'message': "Incomplete data request",
                 'success': False
             }, status=400)
+
+
+class OnboardAuthUsers(ObtainAuthToken):
+    authentication_classes = ()
+    permission_classes = ()
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        users = request.data
+        if len(users) <= 0:
+            return Response({
+                "message": "No users in this databse",
+                "success": False
+            })
+        else:
+            for user in users:
+                if not user["email"] or not user["profile"]["created"] or not user["first_name"] or not user["last_name"] or not user["password"] or not user["profile"]["gender"] or not user["profile"]["birth_date"] or not user["profile"]["country"] or not user["profile"]["phoneno"]:
+                    return Response({
+                        'message': "Something is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                else:
+                    print(user)
+                    _user.onboardUsers(request, lang,user)
+            number = len(users)
+            return Response({
+                "users": number,
+                "message":"These users are now on board",
+                "success":True
+            })
