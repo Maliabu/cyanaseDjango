@@ -1,5 +1,4 @@
 # pip install python-dateutil
-pycryptodomex
 # pip install pyyaml ua-parser user-agents
 # pip install django-user-agents
 acme==1.1.0
@@ -40,6 +39,7 @@ platformdirs==3.0.0
 ply==3.11
 protobuf==4.21.12
 pycparser==2.21
+pycryptodomex==3.18.0
 # PyICU==2.4.2
 pyOpenSSL==23.0.0
 pyRFC3339==1.1
