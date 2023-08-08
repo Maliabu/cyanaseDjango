@@ -94,7 +94,7 @@ idna==2.8
 josepy==1.2.0
 mock==3.0.5
 msgpack==1.0.4
-mysqlclient==2.1.1
+# mysqlclient==2.1.1
 netifaces==0.10.4
 oauth2==1.9.0.post1
 parsedatetime==2.4
