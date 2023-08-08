@@ -8,5 +8,5 @@
         "src": "/(.*)",
         "dest": "cyanase_api/wsgi.py"
     }],
-    "installCommand": "pip3 install -r requirements.txt"
+    "installCommand": "pip3.10 install -r requirements.txt"
 }
