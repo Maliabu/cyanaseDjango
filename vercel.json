@@ -1,12 +1,25 @@
 {
-    "devCommand": "uvicorn main:app --host 0.0.0.0 --port 3000",
+    "version": 1,
     "builds": [{
-        "src": "cyanase_api/wsgi.py",
-        "use": "@vercel/python"
-    }],
+            "src": "cyanase_api/wsgi.py",
+            "use": "@vercel/python",
+            "config": { "maxLambdaSize": "15mb", "runtime": "python3.10" }
+        },
+        {
+            "src": "build_files.sh",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "staticfiles_build"
+            }
+        }
+    ],
     "routes": [{
-        "src": "/(.*)",
-        "dest": "cyanase_api/wsgi.py"
-    }],
-    "installCommand": "pip3.10 install -r requirements.txt"
+            "src": "/static/(.*)",
+            "dest": "/static/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "cyanase_api/wsgi.py"
+        }
+    ]
 }
