@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'django-insecure-rpo9pmgn%+1kn4n9xtz9l*3u(d-a)8p8pj*nlp3y!=pwwi*h(0'
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY','django-insecure-rpo9pmgn%+1kn4n9xtz9l*3u(d-a)8p8pj*nlp3y!=pwwi*h(0')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
@@ -104,14 +104,18 @@ WSGI_APPLICATION = 'cyanase_api.wsgi.application'
 # channels
 ASGI_APPLICATION = "cyanase_api.asgi.application"
 
-
+# EMAIL_HOST = 'mail.cyanase.com'
+# EMAIL_USE_TLS = True
+# EMAIL_PORT = 587
+# EMAIL_HOST_USER = "support@cyanase.com"
+# EMAIL_HOST_PASSWORD = "support@cyanase"
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.environ.get('EAMIL_HOST')
+EMAIL_HOST = 'mail.cyanase.com'
 EMAIL_USE_TLS = True
-EMAIL_PORT = os.environ.get('EAMIL_PORT')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+EMAIL_PORT = 587
+EMAIL_HOST_USER = "support@cyanase.com"
+EMAIL_HOST_PASSWORD = "support@cyanase"
 
 
 # # Database
@@ -193,3 +197,4 @@ CORS_ORIGIN_ALLOW_ALL = True
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:3000',
 ]
+CSRF_COOKIE_SECURE = True

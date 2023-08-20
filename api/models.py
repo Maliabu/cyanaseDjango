@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from datetime import date
+from django.utils.translation import gettext_lazy as _
 
 
 class SupportedLanguage(models.Model):
@@ -56,7 +57,8 @@ class UserType(models.Model):
         return "%s" % self.type_name
 
 # User Profile
-
+def upload_to(instance,filename):
+    return 'media/profile/{filename}'.format(filename=filename)
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -73,7 +75,7 @@ class UserProfile(models.Model):
     address = models.CharField(max_length=30, null=True, blank=True)
     verification_code = models.CharField(max_length=30, null=True, blank=True)
     birth_date = models.DateField(null=True, blank=True)
-    profile_picture = models.CharField(max_length=255, null=True, blank=True)
+    profile_picture = models.ImageField(upload_to='profile',default='photo.png')
     is_verified = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=True)
     is_disabled = models.BooleanField(default=False)

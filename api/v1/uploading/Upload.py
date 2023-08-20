@@ -10,10 +10,13 @@ from django.db.models import Q
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 import os
+from ..users.Users import Users
 from api.config import webconfig
 # helper class
 import sys
 import json
+
+_user = Users()
 
 # master module class
 class Upload:
@@ -26,9 +29,5 @@ class Upload:
             destination.write(chunk)
         destination.close()
         
-    def getUploadedPhoto(self, output):
-        photo = open(output, 'rb')
-        print(photo)
-        
-    ##################33
+    ##################
  

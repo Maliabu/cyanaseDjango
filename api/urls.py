@@ -102,8 +102,6 @@ urlpatterns = [
 #          views.BankTransfer.as_view(), name="get-transfer"),
     path('<str:lang>/auth/user/upload/profile/photo/',
          UploadView.UploadPhoto.as_view(), name="upload-photo"),
-    path('<str:lang>/auth/user/get/profile/photo/',
-         UploadView.GetProfilePhoto.as_view(), name="get-profile-photo"),
     path('<str:lang>/auth/user/update/password/',
          user_view.UpdateAuthUserPassword.as_view(), name="update-user-password"),
     path('<str:lang>/password/reset/',

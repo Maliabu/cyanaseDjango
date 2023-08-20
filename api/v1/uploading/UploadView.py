@@ -14,6 +14,7 @@ from django.contrib.auth import authenticate
 from api.helper.helper import Helper
 from django.db.models import Q
 from api.config import webconfig
+from ..users.Users import Users
 import os
 # from PIL import Image
 ###############33
@@ -22,6 +23,7 @@ DEFAULT_LANG = "en"
 # init module class
 _upload = Upload()
 _helper = Helper()
+_user = Users()
 
 
 class uploadVideo(APIView):
@@ -203,20 +205,13 @@ class UploadPhoto(APIView):
     
     def post(self,request,lang):
         photo = request.data['photo']
+        print(photo)
+        userid = request.user.id
         if photo:
-            destination = 'static/photo.png'
-            _upload.upload(destination,photo)
+            # destination = 'media/profile/'
+            # _upload.upload(destination,photo)
+            _user.UpdateProfilePhoto(request,lang,userid,photo)
             return Response({"message": "Upload successful", "success": True})
         else:
             return Response({"message": "Incomplete request data", "success": False})
     
-class GetProfilePhoto(APIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-    http_method_names = ['get']
-    
-    def get(self,request,lang):
-        destination = 'static/photo.png'
-        response = FileResponse(open(destination, 'rb'), as_attachment=True, filename="profile_photo")
-        return response
-        # return FileResponse(open(destination, 'rb'))

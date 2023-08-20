@@ -33,6 +33,7 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes, force_str, DjangoUnicodeDecodeError
 from api.helper.Cryptor import Cryptor
+import os
 
 
 # master module class
@@ -68,7 +69,7 @@ class Users:
                 "user_type": profile.user_type,
                 "address": profile.address,
                 "birth_date": profile.birth_date,
-                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "profile_picture": f"{webconfig.BASE_URL}media/profile/{profile.profile_picture}",
                 "verification_code": profile.verification_code,
                 "is_verified": profile.is_verified,
                 "is_deletable": profile.is_verified,
@@ -105,7 +106,7 @@ class Users:
                 "phoneno": profile.phoneno,
                 "address": profile.address,
                 "birth_date": profile.birth_date,
-                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "profile_picture": f"{webconfig.API_URL}media/profile/{profile.profile_picture}",
                 "verification_code": profile.verification_code,
                 "is_verified": profile.is_verified,
                 "is_deletable": profile.is_verified,
@@ -141,7 +142,7 @@ class Users:
                 "phoneno": profile.phoneno,
                 "address": profile.address,
                 "birth_date": profile.birth_date,
-                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "profile_picture": f"{webconfig.API_URL}media/profile/{profile.profile_picture}",
                 "verification_code": profile.verification_code,
                 "is_verified": profile.is_verified,
                 "is_deletable": profile.is_verified,
@@ -177,7 +178,7 @@ class Users:
                 "phoneno": profile.phoneno,
                 "address": profile.address,
                 "birth_date": profile.birth_date,
-                "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                "profile_picture": f"{webconfig.API_URL}media/profile/{profile.profile_picture}",
                 "verification_code": profile.verification_code,
                 "is_verified": profile.is_verified,
                 "is_deletable": profile.is_verified,
@@ -229,7 +230,7 @@ class Users:
                         "phoneno": profile.phoneno,
                         "address": profile.address,
                         "birth_date": profile.birth_date,
-                        "profile_picture": f"{webconfig.API_URL}/media/{profile.profile_picture}",
+                        "profile_picture": f"{webconfig.API_URL}media/profile/{profile.profile_picture}",
                         "verification_code": profile.verification_code,
                         "is_verified": profile.is_verified,
                         "is_deletable": profile.is_verified,
@@ -384,6 +385,19 @@ class Users:
     def UpdateUserPhoneNumber(self, request, lang, userid, phone_number):
         UserProfile.objects.filter(user=User(pk=int(userid))).update(
             phoneno=phone_number
+        )
+        
+    def UpdateProfilePhoto(self, request, lang, userid, filename):
+        # name = filename.name
+        user_id = str(userid)
+        output = 'profile_picture'+user_id+'.jpg'
+        # destination = open('media/profile/'+name, 'wb+')
+        destination = open('media/profile/'+output, 'wb+')
+        for chunk in filename.chunks():
+            destination.write(chunk)
+        destination.close()
+        UserProfile.objects.filter(user=User(pk=int(userid))).update(
+            profile_picture=output
         )
 
     def ResendVerificationCode(self, request, lang, email):
@@ -549,10 +563,6 @@ class Users:
         password = user["password"]
         is_verified = user["profile"]["is_verified"]
         gender = user["profile"]["gender"]
-        if gender == "M":
-            gender = "Male"
-        else:
-            gender = "Female"
         birth_date = user["profile"]["birth_date"]
         country = user["profile"]["country"]
         gender = user["profile"]["gender"]

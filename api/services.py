@@ -8,8 +8,8 @@ import requests
 import uuid
 import os
 
-BEARER_INVESTORS = os.environ.get('BEARER_INVESTORS')
-BEARER_SAVERS = os.environ.get('BEARER_SAVERS')
+BEARER_INVESTORS = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
+BEARER_SAVERS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'
 
 
 _helper = Helper()
@@ -192,6 +192,11 @@ class Deposits:
         r = requests.get("https://api.flutterwave.com/v3/transactions/"+transaction_id+"/verify",auth=BearerAuth(BEARER_INVESTORS)).json()
         print(r["status"])
         return r["status"]
+    
+    # def getLinkingProviders(self):
+    #     r = requests.get("http://localhost:4040/linking/providers")
+    #     print(r["providers"])
+    #     return r["providers"]
             
     def getTxRefById(self,request,lang,user,txRef):
         userid = request.user.id

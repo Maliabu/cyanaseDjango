@@ -15,11 +15,11 @@ import os
 
 # Create your views here.
 
-DEFAULT_LANG = os.environ.get('DEFAULT_LANG')
-DEPOSIT_PUB_KEY = os.environ.get('DEPOSIT_PUB_KEY')
-DEPOSIT_SEC_KEY = os.environ.get('DEPOSIT_SEC_KEY')
-SUB_PUB_KEY = os.environ.get('SUB_PUB_KEY')
-SUB_SEC_KEY = os.environ.get('SUB_SEC_KEY')
+DEFAULT_LANG = "en"
+DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
+DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
+SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
+SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
 
 _user = Users()
 _deposit = Deposits()
@@ -138,6 +138,8 @@ class MakeDeposit(APIView):
                 'success': False
             })
         else:
+            # providers = _deposit.getLinkingProviders
+            # print(providers)
             transaction_id = str(reference_id)
             verified = _deposit.verifyTransaction(transaction_id)
             if verified == "success":
@@ -156,7 +158,8 @@ class MakeDeposit(APIView):
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
-
+    
+    
 class MakeDepositToBank(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
