@@ -34,6 +34,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_bytes, force_str, DjangoUnicodeDecodeError
 from api.helper.Cryptor import Cryptor
 import os
+import random
 
 
 # master module class
@@ -389,8 +390,9 @@ class Users:
         
     def UpdateProfilePhoto(self, request, lang, userid, filename):
         # name = filename.name
+        name_id = str(random.random())
         user_id = str(userid)
-        output = 'profile_picture'+user_id+'.jpg'
+        output = 'profile_picture'+user_id+name_id+'.jpg'
         # destination = open('media/profile/'+name, 'wb+')
         destination = open('media/profile/'+output, 'wb+')
         for chunk in filename.chunks():
