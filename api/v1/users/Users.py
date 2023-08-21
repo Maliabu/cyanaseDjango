@@ -329,7 +329,7 @@ class Users:
         gender = profile["gender"]
         phoneno = profile["phone_no"]
         birth_date = profile["birth_date"] if profile["birth_date"] else None
-        profile_picture = "default_profile.jpg"
+        profile_picture = "default_picture.jpg"
         verificationcode = str(self.help.getRandom())
         # package = self.package.getPackageByCodeName(request, lang, "free")
         # defaultpkgid = package["id"]
@@ -393,14 +393,31 @@ class Users:
         name_id = str(random.random())
         user_id = str(userid)
         output = 'profile_picture'+user_id+name_id+'.jpg'
-        # destination = open('media/profile/'+name, 'wb+')
-        destination = open('media/profile/'+output, 'wb+')
-        for chunk in filename.chunks():
-            destination.write(chunk)
-        destination.close()
-        UserProfile.objects.filter(user=User(pk=int(userid))).update(
-            profile_picture=output
-        )
+        #########################
+        # let us first delete the other photos of this user before updating a new one
+        
+        old_profile_pictures = UserProfile.objects.filter(user=User(pk=int(userid))).get()
+        old_picture = old_profile_pictures.profile_picture
+        old_picture_name = old_picture.name
+        print(old_picture_name)
+        if old_picture_name != "default_picture.jpg":
+            ######### remove old picture
+            os.remove('media/profile/'+old_picture_name)
+            destination = open('media/profile/'+output, 'wb+')
+            for chunk in filename.chunks():
+                destination.write(chunk)
+            destination.close()
+            UserProfile.objects.filter(user=User(pk=int(userid))).update(
+                profile_picture=output
+            )
+        else:
+            destination = open('media/profile/'+output, 'wb+')
+            for chunk in filename.chunks():
+                destination.write(chunk)
+            destination.close()
+            UserProfile.objects.filter(user=User(pk=int(userid))).update(
+                profile_picture=output
+            )
 
     def ResendVerificationCode(self, request, lang, email):
         verificationcode = str(self.help.getRandom())
