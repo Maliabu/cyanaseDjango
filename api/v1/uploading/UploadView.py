@@ -205,7 +205,6 @@ class UploadPhoto(APIView):
     
     def post(self,request,lang):
         photo = request.data['photo']
-        print(photo)
         userid = request.user.id
         if photo:
             # destination = 'media/profile/'

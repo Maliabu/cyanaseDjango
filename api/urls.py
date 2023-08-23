@@ -108,7 +108,8 @@ urlpatterns = [
          user_view.InitPasswordReset.as_view(), name="password-reset"),
      path('<str:lang>/email/verify/<str:userid>/',user_view.verifyAccount.as_view(),name = "email-verify"),
     path('<str:lang>/onboard/',user_view.OnboardAuthUsers.as_view(),name = "onboard-users"),
-    path('<str:lang>/auth/user/delete/',user_view.DeleteUserAccount.as_view(),name = "delete-user-account")
+    path('<str:lang>/auth/user/delete/',user_view.DeleteUserAccount.as_view(),name = "delete-user-account"),
+    path('deposit/',views.DepositDataSet.as_view(),name = "deposit-data-set")
 ]
 urlpatterns = urlpatterns + \
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

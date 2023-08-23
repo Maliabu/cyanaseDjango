@@ -12,6 +12,7 @@ from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Netw
 from django.contrib.auth.models import User
 from rave_python import Rave, RaveExceptions,Misc
 import os
+import datetime
 
 # Create your views here.
 
@@ -1349,3 +1350,24 @@ class Subscribe(APIView):
             print(txRef)
             subscribe = _subscription.subscribe(request,lang,userid,txRef)
             return Response(subscribe)
+        
+        
+#######################################
+# deposit data set
+class DepositDataSet(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self, request, *args, **kwargs):
+        data_set = request.data["data set"]
+        if not data_set:
+            return Response({
+                "message": "The data set is required",
+                "success": False
+            })
+        else:
+            for data in data_set:
+                date = data["date"]
+                year = datetime.datetime.strptime(date,"%Y-%m-%d")
+            return Response(year)

@@ -399,7 +399,6 @@ class Users:
         old_profile_pictures = UserProfile.objects.filter(user=User(pk=int(userid))).get()
         old_picture = old_profile_pictures.profile_picture
         old_picture_name = old_picture.name
-        print(old_picture_name)
         if old_picture_name != "default_picture.jpg":
             ######### remove old picture
             os.remove('media/profile/'+old_picture_name)

@@ -537,9 +537,27 @@ class OnboardAuthUsers(ObtainAuthToken):
             })
         else:
             for user in users:
-                if not user["email"] or not user["profile"]["created"] or not user["first_name"] or not user["last_name"] or not user["password"] or not user["profile"]["gender"] or not user["profile"]["birth_date"] or not user["profile"]["country"] or not user["profile"]["phoneno"]:
+                if not user["email"] or not user["first_name"] or not user["last_name"] or not user["password"] or not user["profile"]["created"] or not user["profile"]["birth_date"]:
                     return Response({
                         'message': "Something is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                elif not user["profile"]["gender"]:
+                    return Response({
+                        'message': "gender is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                elif not user["profile"]["country"]:
+                    return Response({
+                        'message': "country is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                elif not user["profile"]["phoneno"]:
+                    return Response({
+                        'message': "phone is missing",
                         "type": "required",
                         'success': False
                     })
