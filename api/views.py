@@ -1370,4 +1370,8 @@ class DepositDataSet(APIView):
             for data in data_set:
                 date = data["date"]
                 year = datetime.datetime.strptime(date,"%Y-%m-%d")
-            return Response(year)
+                month = year.strftime("%b")
+                new_year = year.strftime("%Y")
+                data["date"] = new_year
+                data["updated"] = month
+            return Response(data_set)
