@@ -16,6 +16,7 @@ class SupportedLanguage(models.Model):
     def __str__(self):
         return "%s" % self.lang_name
 
+
 #######################################
 
 
@@ -33,7 +34,8 @@ class SupportedCountry(models.Model):
 
 class TimeZone(models.Model):
     country = models.ForeignKey(
-        SupportedCountry, on_delete=models.CASCADE, null=True, blank=True)
+        SupportedCountry, on_delete=models.CASCADE, null=True, blank=True
+    )
     dispaly_name = models.CharField(max_length=255)
     code_name = models.CharField(max_length=255)
     is_default = models.BooleanField(default=False)
@@ -56,15 +58,16 @@ class UserType(models.Model):
     def __str__(self):
         return "%s" % self.type_name
 
+
 # User Profile
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     user_type = models.CharField(max_length=200, default="personal", null=True)
     country = models.CharField(max_length=200, default="uganda", null=True)
     language = models.ForeignKey(
-        SupportedLanguage, on_delete=models.CASCADE, null=True, blank=True)
-    tmz = models.ForeignKey(
-        TimeZone, on_delete=models.CASCADE, null=True, blank=True)
+        SupportedLanguage, on_delete=models.CASCADE, null=True, blank=True
+    )
+    tmz = models.ForeignKey(TimeZone, on_delete=models.CASCADE, null=True, blank=True)
     bussiness_name = models.CharField(max_length=255, null=True, blank=True)
     website = models.CharField(max_length=255, null=True, blank=True)
     gender = models.CharField(max_length=255, null=True, blank=True)
@@ -72,7 +75,9 @@ class UserProfile(models.Model):
     address = models.CharField(max_length=30, null=True, blank=True)
     verification_code = models.CharField(max_length=30, null=True, blank=True)
     birth_date = models.DateField(null=True, blank=True)
-    profile_picture = models.ImageField(upload_to='profile',default='default_picture.jpg')
+    profile_picture = models.ImageField(
+        upload_to="profile", default="default_picture.jpg"
+    )
     is_verified = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=True)
     is_disabled = models.BooleanField(default=False)
@@ -92,39 +97,65 @@ def create_user_profile(sender, instance, created, **kwargs):
 def save_user_profile(sender, instance, **kwargs):
     instance.userprofile.save()
 
+
 class NextOfKin(models.Model):
-    first_name = models.CharField(verbose_name="first name",default="first name", max_length=200)
-    last_name = models.CharField(verbose_name="last name", default="last name", max_length=200)
+    first_name = models.CharField(
+        verbose_name="first name", default="first name", max_length=200
+    )
+    last_name = models.CharField(
+        verbose_name="last name", default="last name", max_length=200
+    )
     phone = models.IntegerField(verbose_name="phone", default="+256 000 000 000")
     email = models.EmailField(verbose_name="email", default="nextofkin@gmail.com")
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     created = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
         return "%s" % self.first_name
-    
+
 
 class RiskProfile(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     qn1 = models.CharField(max_length=200, default="saving", verbose_name="objectives")
-    qn2 = models.CharField(max_length=200, default="less_than_year", verbose_name="horizon")
-    qn3 = models.CharField(max_length=200, default="treasuries", verbose_name="past investing")
-    qn4 = models.CharField(max_length=200, default="less_ten_percent", verbose_name="portfolio max loss")
+    qn2 = models.CharField(
+        max_length=200, default="less_than_year", verbose_name="horizon"
+    )
+    qn3 = models.CharField(
+        max_length=200, default="treasuries", verbose_name="past investing"
+    )
+    qn4 = models.CharField(
+        max_length=200, default="less_ten_percent", verbose_name="portfolio max loss"
+    )
     qn5 = models.CharField(max_length=200, default="least", verbose_name="capital")
-    qn6 = models.CharField(max_length=200, default="employment", verbose_name="funds source")
-    qn7 = models.CharField(max_length=200, default="guaranteed_returns", verbose_name="goals")
+    qn6 = models.CharField(
+        max_length=200, default="employment", verbose_name="funds source"
+    )
+    qn7 = models.CharField(
+        max_length=200, default="guaranteed_returns", verbose_name="goals"
+    )
     qn8 = models.CharField(max_length=200, default="A", verbose_name="profit or loss")
     qn9 = models.CharField(max_length=200, default="no", verbose_name="risk")
-    qn10 = models.CharField(max_length=200, default="no", verbose_name="future investing")
-    qn11 = models.CharField(max_length=200, default="comfortable", verbose_name="inflation impact")
+    qn10 = models.CharField(
+        max_length=200, default="no", verbose_name="future investing"
+    )
+    qn11 = models.CharField(
+        max_length=200, default="comfortable", verbose_name="inflation impact"
+    )
     created = models.DateTimeField(auto_now_add=True)
     score = models.IntegerField(verbose_name="score", default=0)
-    risk_analysis = models.CharField(max_length=200, verbose_name="analysis",default="Incomplete Risk profile")
-    investment_option = models.CharField(max_length=200,verbose_name="investment option", default="Cash | Venture | Credit")
+    risk_analysis = models.CharField(
+        max_length=200, verbose_name="analysis", default="Incomplete Risk profile"
+    )
+    investment_option = models.CharField(
+        max_length=200,
+        verbose_name="investment option",
+        default="Cash | Venture | Credit",
+    )
     is_complete = models.BooleanField(default=False, verbose_name="status")
-    
+
     def __str__(self):
         return "%s" % self.user.first_name
+
 
 class MerchantApp(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -134,10 +165,12 @@ class MerchantApp(models.Model):
 
     def __str__(self):
         return "%s | %s| %s" % (str(self.user), self.app_name, self.api_key)
-    
+
+
 class Currency(models.Model):
     country = models.ForeignKey(
-        SupportedCountry, on_delete=models.CASCADE, null=True, blank=True)
+        SupportedCountry, on_delete=models.CASCADE, null=True, blank=True
+    )
     currency_locale = models.CharField(max_length=255)
     currency_code = models.CharField(max_length=255)
     currency_symbol = models.CharField(max_length=255)
@@ -151,6 +184,7 @@ class Currency(models.Model):
 
     def __str__(self):
         return "%s" % self.currency_locale
+
 
 # Main Application Modules
 
@@ -170,6 +204,7 @@ class Module(models.Model):
     def __str__(self):
         return "%s" % self.module_name
 
+
 # Side Menu Modules
 
 
@@ -181,6 +216,7 @@ class SideMenu(models.Model):
 
     def __str__(self):
         return "%s" % self.module
+
 
 # Dashboard menu model
 
@@ -234,12 +270,10 @@ class PaymentMethod(models.Model):
 
 
 class PaymentOption(models.Model):
-    payment_method = models.ForeignKey(
-        PaymentMethod, on_delete=models.DO_NOTHING)
+    payment_method = models.ForeignKey(PaymentMethod, on_delete=models.DO_NOTHING)
     en_payment_option_name = models.CharField(max_length=200)
     code_name = models.CharField(max_length=200)
-    payment_option_logo = models.CharField(
-        max_length=200, null=True, blank=True)
+    payment_option_logo = models.CharField(max_length=200, null=True, blank=True)
     sort_value = models.IntegerField(default=0)
     has_standarded_charge = models.BooleanField(default=False)
     payment_charge = models.FloatField(default=0, blank=True, null=True)
@@ -255,8 +289,7 @@ class PaymentOption(models.Model):
 
 
 class PaymentOptionField(models.Model):
-    payment_option = models.ForeignKey(
-        PaymentOption, on_delete=models.DO_NOTHING)
+    payment_option = models.ForeignKey(PaymentOption, on_delete=models.DO_NOTHING)
     en_entry_name = models.CharField(max_length=500)
     entry_code_name = models.CharField(max_length=255)
     has_entry_value = models.BooleanField(default=False)
@@ -271,12 +304,15 @@ class PaymentOptionField(models.Model):
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return "[%s] %s : %s" % (str(self.payment_option), self.en_entry_name, str(self.entry_value))
+        return "[%s] %s : %s" % (
+            str(self.payment_option),
+            self.en_entry_name,
+            str(self.entry_value),
+        )
 
 
 class PaymentOptionSetting(models.Model):
-    payment_option = models.ForeignKey(
-        PaymentOption, on_delete=models.DO_NOTHING)
+    payment_option = models.ForeignKey(PaymentOption, on_delete=models.DO_NOTHING)
     en_entry_name = models.CharField(max_length=500)
     entry_code_name = models.CharField(max_length=255)
     has_entry_value = models.BooleanField(default=False)
@@ -288,13 +324,16 @@ class PaymentOptionSetting(models.Model):
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return "[%s] %s : %s" % (str(self.payment_option), self.en_entry_name, str(self.entry_value))
+        return "[%s] %s : %s" % (
+            str(self.payment_option),
+            self.en_entry_name,
+            str(self.entry_value),
+        )
 
 
 class PaymentOptionSupport(models.Model):
     payment_type = models.ForeignKey(PaymentType, on_delete=models.DO_NOTHING)
-    payment_option = models.ForeignKey(
-        PaymentOption, on_delete=models.DO_NOTHING)
+    payment_option = models.ForeignKey(PaymentOption, on_delete=models.DO_NOTHING)
     country = models.ForeignKey(SupportedCountry, on_delete=models.DO_NOTHING)
     is_disabled = models.BooleanField(default=False)
     is_default = models.BooleanField(default=False)
@@ -306,8 +345,7 @@ class PaymentOptionSupport(models.Model):
 
 class PaymentTypeOption(models.Model):
     payment_type = models.ForeignKey(PaymentType, on_delete=models.DO_NOTHING)
-    payment_option = models.ForeignKey(
-        PaymentOption, on_delete=models.DO_NOTHING)
+    payment_option = models.ForeignKey(PaymentOption, on_delete=models.DO_NOTHING)
     is_disabled = models.BooleanField(default=False)
     is_default = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
@@ -343,7 +381,11 @@ class PaymentTypeSetting(models.Model):
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return "[%s] %s : %s" % (str(self.payment_type), self.entry_name, str(self.entry_value))
+        return "[%s] %s : %s" % (
+            str(self.payment_type),
+            self.entry_name,
+            str(self.entry_value),
+        )
 
 
 class AccountType(models.Model):
@@ -358,6 +400,7 @@ class AccountType(models.Model):
     def __str__(self):
         return "%s" % self.type_name
 
+
 class BankTransaction(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     account_number = models.CharField(max_length=200)
@@ -365,9 +408,10 @@ class BankTransaction(models.Model):
     reference_id = models.CharField(max_length=200)
     reference = models.CharField(max_length=200)
     created = models.CharField(max_length=200)
-    
+
     def __str__(self):
         return "%s" % self.reference_id
+
 
 class Goal(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -388,12 +432,12 @@ class Deposit(models.Model):
     payment_means = models.CharField(max_length=200, null=True)
     deposit_category = models.CharField(max_length=200, null=True)
     deposit_amount = models.BigIntegerField(default=0)
-    currency = models.CharField(max_length=200, default='UGX')
+    currency = models.CharField(max_length=200, default="UGX")
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
     investment_option = models.CharField(max_length=200, default="risk_analysis")
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
-    reference = models.CharField(max_length=200,default="")
+    reference = models.CharField(max_length=200, default="")
     reference_id = models.IntegerField(default=0)
     txRef = models.CharField(max_length=200)
 
@@ -405,15 +449,16 @@ class Withdraw(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     withdraw_channel = models.CharField(max_length=200, default="bank")
     withdraw_amount = models.BigIntegerField(default=0)
-    currency = models.CharField(max_length=200, default='UGX')
+    currency = models.CharField(max_length=200, default="UGX")
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
     created = models.DateTimeField(auto_now_add=True)
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     transaction = models.ForeignKey(BankTransaction, on_delete=models.CASCADE)
-    status = models.CharField(max_length=200,default="")
+    status = models.CharField(max_length=200, default="")
 
     def __str__(self):
         return "%s - %s" % (self.user, self.withdraw_amount)
+
 
 class DepositType(models.Model):
     type_name = models.CharField(max_length=200)
@@ -425,6 +470,7 @@ class DepositType(models.Model):
     def __str__(self):
         return "%s" % self.type_name
 
+
 class Subscription(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     is_subscribed = models.BooleanField(default=False)
@@ -432,21 +478,23 @@ class Subscription(models.Model):
     reference_id = models.IntegerField(default=0)
     reference = models.CharField(max_length=200)
     amount = models.BigIntegerField(default=0)
-    currency = models.CharField(max_length=200, default='UGX')
+    currency = models.CharField(max_length=200, default="UGX")
     created = models.DateTimeField(auto_now_add=True)
     txRef = models.CharField(max_length=200)
-    
+
     def __str__(self):
         return "%s" % self.is_subscribed
+
 
 class Networth(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     amount = models.BigIntegerField(default=0)
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
         return "%s" % self.amount
+
 
 class DepositTime(models.Model):
     time_name = models.CharField(max_length=200)
@@ -463,8 +511,7 @@ class Account(models.Model):
     account_type = models.ForeignKey(AccountType, on_delete=models.CASCADE)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     account_name = models.CharField(max_length=500)
-    currency = models.ForeignKey(
-        Currency, on_delete=models.CASCADE)  # Default currency
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)  # Default currency
     opening_balance = models.FloatField(default=0)
     account_no = models.CharField(max_length=300)
     is_operational_account = models.BooleanField(default=False)
