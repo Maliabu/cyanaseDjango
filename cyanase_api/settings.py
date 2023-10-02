@@ -136,7 +136,7 @@ DATABASES = {
         "USER": "root",
         "PASSWORD": "root",
         "HOST": "34.170.138.183",
-        # "PORT": "3306",
+        "PORT": "3306",
     },
 #     "default": {
 #         "ENGINE": "django.db.backends.mysql",
