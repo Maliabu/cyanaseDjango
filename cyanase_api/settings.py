@@ -135,7 +135,7 @@ DATABASES = {
         "NAME": "cyanase",
         "USER": "root",
         "PASSWORD": "root",
-        "HOST": "127.0.0.1",
+        "HOST": "34.170.138.183",
         # "PORT": "3306",
     },
 #     "default": {
