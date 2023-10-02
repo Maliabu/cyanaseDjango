@@ -84,10 +84,12 @@ urlpatterns = [
          views.GetSubscriptionStatus.as_view(), name="get-subscription-status"),
     path('<str:lang>/auth/user/login/',
          user_view.LoginUserAuthToken.as_view(), name="login-user"),
-    path('<str:lang>/auth/token/', 
+    path('<str:lang>/auth/token/',
          views.CreateUserAuthToken.as_view(), name="create-user-token"),
     path('<str:lang>/auth/user/',
          user_view.GetAuthUser.as_view(), name="get-auth-user"),
+    path('<str:lang>/auth/user/email/',
+         user_view.GetAuthUserByEmail.as_view(), name="get-auth-user-by-email"),
     path('<str:lang>/auth/user/riskprofile/',
          views.AddRiskProfile.as_view(), name="add-risk-profile"),
     path('<str:lang>/auth/get/riskprofile/',
@@ -102,6 +104,8 @@ urlpatterns = [
 #          views.BankTransfer.as_view(), name="get-transfer"),
     path('<str:lang>/auth/user/upload/profile/photo/',
          UploadView.UploadPhoto.as_view(), name="upload-photo"),
+    path('<str:lang>/auth/user/account/type/',
+         views.AddAccountTypes.as_view(), name="add-account-types"),
     path('<str:lang>/auth/user/update/password/',
          user_view.UpdateAuthUserPassword.as_view(), name="update-user-password"),
     path('<str:lang>/password/reset/',
@@ -109,7 +113,9 @@ urlpatterns = [
      path('<str:lang>/email/verify/<str:userid>/',user_view.verifyAccount.as_view(),name = "email-verify"),
     path('<str:lang>/onboard/',user_view.OnboardAuthUsers.as_view(),name = "onboard-users"),
     path('<str:lang>/auth/user/delete/',user_view.DeleteUserAccount.as_view(),name = "delete-user-account"),
-    path('deposit/',views.DepositDataSet.as_view(),name = "deposit-data-set")
+    path('deposit/',views.DepositDataSet.as_view(),name = "deposit-data-set"),
+    path('<str:lang>/users/deposits/',views.OnboardAuthUsersDeposits.as_view(),name = "all-user-deposits"),
+    path('<str:lang>/users/withdraws/',views.OnboardAuthUsersWithdraws.as_view(),name = "all-user-withdraws")
 ]
 urlpatterns = urlpatterns + \
     static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

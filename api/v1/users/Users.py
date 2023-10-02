@@ -27,7 +27,7 @@ from django.contrib.auth.models import User
 import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
-from ...models import *
+from ...models import UserProfile
 from django.urls import resolve, reverse
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -206,6 +206,9 @@ class Users:
         results = []
         User = get_user_model()
         users = User.objects.all()
+        User.objects.update(
+            is_active = True
+        )
         for user in users:
             userid = user.pk
             profile = UserProfile.objects.get(user=User(pk=userid))
@@ -272,10 +275,20 @@ class Users:
         else:
             return False
 
-    def isAccounVerified(self, request, lang, id, token):
+    def isAccounVerified(self, request, lang, userid, token):
+        user_prof = (
+            UserProfile.objects.filter(user=User(pk=int(userid)))
+            .filter(verification_code=token)
+            .filter(is_verified=True)
+        )
+        if user_prof.exists():
+            return True
+        else:
+            return False
+        
+    def isUserAccountVerified(self, request, lang, id):
         user_prof = (
             UserProfile.objects.filter(user=User(pk=int(id)))
-            .filter(verification_code=token)
             .filter(is_verified=True)
         )
         if user_prof.exists():
@@ -591,7 +604,7 @@ class Users:
         users.last_name = last_name
         users.is_superuser = False
         users.is_staff = False
-        users.is_active = False
+        users.is_active = True
         users.save()
         userid = users.pk
         uuser = User.objects.get(pk=userid)

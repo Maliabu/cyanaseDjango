@@ -61,7 +61,37 @@ class GetAuthUserById(APIView):
         user = _user.getAuthUserById(request, lang, userid)
         return Response(user)
 
-# Generate custom AUTH Token
+
+class IsVerified(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang, userid):
+        if not str(userid):
+            return Response({
+                'message': "Incomplete data request",
+                'success': False
+            })
+        lang = DEFAULT_LANG if lang == None else lang
+        user = _user.isUserAccountVerified(request, lang, userid)
+        return Response(user)
+
+
+class GetAuthUserByEmail(ObtainAuthToken):
+    def post(self, request, lang):
+        email = request.data
+        if not str(email):
+            return Response({
+                'message': "Incomplete data request",
+                'success': False
+            })
+        lang = DEFAULT_LANG if lang == None else lang
+        user = _user.emailExists(request,lang,email)
+        if user:
+            return Response(True)
+        else:
+            return Response(False)
 
 
 class CreateUserAuthToken(ObtainAuthToken):
@@ -320,6 +350,7 @@ class DeleteUserAccount(APIView):
         user = _user.DeleteAccount(request, lang)
         if user:
             return Response({"message": "Account deleted successfuly", "success": True}, status=200)
+
 
 class UpdateAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]

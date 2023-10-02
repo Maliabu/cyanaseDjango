@@ -1,14 +1,12 @@
-from django.shortcuts import render
-# Create your views here.
-from django.shortcuts import render, HttpResponse
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from django.shortcuts import HttpResponse
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from .v1.users.Users import Users
-from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths,BankTransactions, Subscriptions, TransactionRef
+from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths,BankTransactions, Subscriptions, TransactionRef, AccountTypes
 from django.contrib.auth.models import User
 from rave_python import Rave, RaveExceptions,Misc
 import os
@@ -31,7 +29,10 @@ _riskprofile = RiskProfiles()
 _networth = Networths()
 _transaction = BankTransactions()
 _subscription = Subscriptions()
-_refs = TransactionRef
+_refs = TransactionRef()
+_accountType = AccountTypes()
+
+
 class index(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -53,6 +54,7 @@ class GetUserView(APIView):
         }
         return Response(content)
 
+
 class CreateUserAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data,
@@ -65,6 +67,64 @@ class CreateUserAuthToken(ObtainAuthToken):
             'user_id': user.pk,
             'email': user.email
         })
+
+
+class AddAccountTypes(ObtainAuthToken):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        type_name = request.data["type_name"]
+        code_name = request.data["code_name"]
+        description = request.data["description"]
+        sort_value = request.data["sort_value"]
+        is_default = request.data["is_default"]
+        ##########################
+        if not type_name:
+            return Response({
+                'message': "This field is required",
+                "type": "type_name",
+                'success': False
+            })
+        elif not code_name:
+            return Response({
+                'message': "This field is required",
+                "type": "code_name",
+                'success': False
+            })
+        elif not description:
+            return Response({
+                'message': "This field is required",
+                "type": "description",
+                'success': False
+            })
+        elif not sort_value:
+            return Response({
+                'message': "This field is required",
+                "type": "sort_value",
+                'success': False
+            })
+        elif not is_default:
+            return Response({
+                'message': "This field is required",
+                "type": "is_default",
+                'success': False
+            })
+        else:
+            account_type = _accountType.createAccountTypes(request, lang)
+            if account_type["success"] is True:
+                return Response({
+                    "message": "Account Types added successfully",
+                    "success": True
+                })
+            else:
+                return Response({
+                    "message": "Account Types not added",
+                    "success": False
+                })
+
 
 class MakeDeposit(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
@@ -81,7 +141,6 @@ class MakeDeposit(APIView):
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
-        txRef = request.data["tx_ref"]
         user = _user.getAuthUser(request, lang)
         ##########################
         if not payment_means:
@@ -132,12 +191,6 @@ class MakeDeposit(APIView):
                 "type": "reference_id",
                 'success': False
             })
-        elif not txRef:
-            return Response({
-                'message': "This field is required",
-                "type": "txRef",
-                'success': False
-            })
         else:
             # providers = _deposit.getLinkingProviders
             # print(providers)
@@ -145,11 +198,11 @@ class MakeDeposit(APIView):
             verified = _deposit.verifyTransaction(transaction_id)
             if verified == "success":
                 txRef = _refs.getTxRef()
-                tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
-                if tx_ref["success"] == False:
-                    deposit = _deposit.createDeposit(request, lang, user,txRef)
+                tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
+                if tx_ref["success"] is False:
+                    deposit = _deposit.createDeposit(request, lang, user, txRef)
                     return Response(deposit)
-                if tx_ref["success"] == True:
+                if tx_ref["success"] is True:
                     return Response({
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
@@ -159,8 +212,8 @@ class MakeDeposit(APIView):
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
-    
-    
+
+
 class MakeDepositToBank(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -253,7 +306,7 @@ class MakeDepositToBank(APIView):
                 "phonenumber": user["profile"]["phoneno"],
                 "firstname": user["first_name"],
                 "lastname": user["last_name"],
-                "tx_ref":"MC-3243e",
+                "tx_ref": "MC-3243e",
                 "IP": "355426087298442",
             }
             try:
@@ -266,7 +319,7 @@ class MakeDepositToBank(APIView):
                         Misc.updatePayload(res["suggestedAuth"], payload, pin="3310")
                     if arg == "address":
                         Misc.updatePayload(res["suggestedAuth"], payload, address= {"billingzip": "07205", "billingcity": "Hillside", "billingaddress": "470 Mundet PI", "billingstate": "NJ", "billingcountry": "US"})
-        
+       
                 res = rave.Card.charge(payload)
 
                 if res["validationRequired"]:
@@ -431,18 +484,18 @@ class GetGoalById(APIView):
     
     
 class CreateGoal(APIView):
-    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
     
     def post(self, request, lang, *args, **kwargs):
-        user = _user.getAuthUser(request,lang)
-        lang = DEFAULT_LANG if lang == None else lang
+        user = _user.getAuthUser(request, lang)
+        lang = DEFAULT_LANG if lang is None else lang
         goal_name = request.data["goal_name"]
         goal_period = request.data["goal_period"]
         goal_amount = request.data["goal_period"]
         deposit_type = request.data["deposit_type"]
-        deposit_reminder_day = request.data["deposit_reminder_day"]
+        # deposit_reminder_day = request.data["deposit_reminder_day"]
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
         deposit_amount = request.data["deposit_amount"]
@@ -452,29 +505,29 @@ class CreateGoal(APIView):
         reference_id = request.data["reference_id"]
         txRef = request.data["tx_ref"]
         if not goal_name:
-            return{
+            return Response({
                 "message": "This field is required",
                 "success": False,
                 "type": "goal name"
-            }
+            })
         elif not goal_period:
-            return{
+            return Response({
                 "message": "This field is required",
                 "success": False,
                 "type": "goal period"
-            }
+            })
         elif not goal_amount:
-            return{
+            return Response({
                 "message": "This field is required",
                 "success": False,
                 "type": "goal amount"
-            }
+            })
         elif not deposit_type:
-            return{
+            return Response({
                 "message": "This field is required",
                 "success": False,
                 "type": "deposit type"
-            }
+            })
         elif not payment_means:
             return Response({
                 'message': "This field is required",
@@ -506,7 +559,7 @@ class CreateGoal(APIView):
                 'success': False
             })
         elif not reference:
-                return Response({
+            return Response({
                 'message': "This field is required",
                 "type": "reference",
                 'success': False
@@ -524,18 +577,18 @@ class CreateGoal(APIView):
                 'success': False
             })
         else:
-            goal = _goal.createGoal(request, lang,user)
+            goal = _goal.createGoal(request, lang, user)
             goalid = goal["goalid"]
             transaction_id = str(reference_id)
             verified = _deposit.verifyTransaction(transaction_id)
             if verified == "success":
                 txRef = _refs.getTxRef()
-                tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
-                if tx_ref["success"] == False:
-                    deposit = _deposit.depositToGoal(request, lang, user,goalid,txRef)
+                tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
+                if tx_ref["success"] is False:
+                    deposit = _deposit.depositToGoal(request, lang, user, goalid, txRef)
                     print(deposit)
                     return Response(goal)
-                if tx_ref["success"] == True:
+                if tx_ref["success"] is True:
                     return Response({
                         'message': "Something went wrong. Goal not created",
                         'success': False
@@ -1360,7 +1413,7 @@ class DepositDataSet(APIView):
     http_method_names = ['post']
     
     def post(self, request, *args, **kwargs):
-        data_set = request.data["data set"]
+        data_set = request.data
         if not data_set:
             return Response({
                 "message": "The data set is required",
@@ -1375,3 +1428,69 @@ class DepositDataSet(APIView):
                 data["date"] = new_year
                 data["updated"] = month
             return Response(data_set)
+
+class OnboardAuthUsersDeposits(ObtainAuthToken):
+    authentication_classes = ()
+    permission_classes = ()
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang == None else lang
+        deposits = request.data
+        if len(deposits) <= 0:
+            return Response({
+                "message": "No deposits in this databse",
+                "success": False
+            })
+        else:
+            for deposit in deposits:
+                if not deposit["email"] or not deposit["deposit_amount"] or not deposit["payment_method"] or not deposit["currency"] or not deposit["date"]:
+                    return Response({
+                        'message': "Something is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                else:
+                    email = deposit["email"]
+                    user = _user.getAuthUserByEmail(request,lang,email)
+                    print(user)
+                    _deposit.createDeposits(request,lang,deposit,user)
+            number = len(deposits)
+            return Response({
+                "users": number,
+                "message":"These users have their deposits in order",
+                "success":True
+            })
+            
+class OnboardAuthUsersWithdraws(ObtainAuthToken):
+    authentication_classes = ()
+    permission_classes = ()
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang == None else lang
+        withdraws = request.data
+        if len(withdraws) <= 0:
+            return Response({
+                "message": "No withdraw data",
+                "success": False
+            })
+        else:
+            for withdraw in withdraws:
+                if not withdraw["email"] or not withdraw["withdraw"] or not withdraw["date"]:
+                    return Response({
+                        'message': "Something is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                else:
+                    email = withdraw["email"]
+                    user = _user.getAuthUserByEmail(request,lang,email)
+                    print(user)
+                    _withdraw.withdraws(request,lang,withdraw,user)
+            number = len(withdraws)
+            return Response({
+                "users": number,
+                "message":"These users have their withdraws in order",
+                "success":True
+            })

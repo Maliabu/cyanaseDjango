@@ -1,12 +1,12 @@
 
 import datetime
-from .models import *
+from .models import Deposit, AccountType, Goal, Subscription, Withdraw, RiskProfile
 from .helper.helper import Helper
-from .v1.locale import Locale
+# from .v1.locale import Locale
 from django.contrib.auth.models import User
 import requests
 import uuid
-import os
+# import os
 
 BEARER_INVESTORS = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
 BEARER_SAVERS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'
@@ -14,10 +14,13 @@ BEARER_SAVERS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'
 
 _helper = Helper()
 
+
 class TransactionRef:
-    def getTxRef():
+    def getTxRef(self):
         txRef = str(uuid.uuid4())
         return txRef
+
+
 class Subscriptions:
     def __init__(self):
         self.help = Helper()
@@ -335,9 +338,7 @@ class Deposits:
                 "success": False
             }
 
-
-
-    def createDeposit(self, request, lang, user,txRef):
+    def createDeposit(self, request, lang, txRef):
         current_datetime = datetime.datetime.now()
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
@@ -385,16 +386,96 @@ class Deposits:
                 "time of deposit": current_datetime
             }
         else:
-            return{
+            return {
                 "message": "your account is not verified, please check your email and verify",
                 "success": False
             }
+
+    def createDeposits(self, request, lang, deposit, user):
+        payment_means = "online"
+        deposit_category = "personal"
+        deposit_amount = deposit["deposit_amount"]
+        investment_option = "Cash | Credit | Venture"
+        currency = deposit["currency"]
+        networth = deposit["networth"]
+        created = deposit["date"]
+        account_type = "basic"
+        reference = "TEST"
+        reference_id = 0
+        txRef = "CYANASE_TEST"
+        userid = user["user_id"]
+        account_type = AccountType.objects.filter(code_name=account_type).get()
+        deposit = Deposit.objects.create(
+                deposit_amount=float(deposit_amount),
+                payment_means=payment_means,
+                user=User(pk=int(userid)),
+                deposit_category=deposit_category,
+                investment_option=investment_option,
+                currency=currency,
+                account_type=account_type,
+                reference=reference,
+                reference_id=reference_id,
+                txRef=txRef,
+                created=created,
+                networth=float(networth)
+            )
+        deposit.save()
+            # # get deposit id
+        depositid = deposit.id
+            # # Get the user making the deposit by id
+        deposit = self.getDeopsitById(request, lang, depositid)
+        if deposit:
+            return {
+                "message": f"Yeap deposits are in",
+                "success": True
+            }
+        else:
+            return{
+                "message": "something went terribly wrong",
+                "success": False
+            }
+
+
+class AccountTypes:
+    def __init__(self):
+        self.help = Helper()
+
+    def createAccountTypes(self, request, lang):
+        type_name = request.data["type_name"]
+        code_name = request.data["code_name"]
+        description = request.data["description"]
+        sort_value = request.data["sort_value"]
+        is_default = request.data["is_default"]
+        is_disabled = False
+        account_type = AccountType.objects.create(
+            type_name=type_name,
+            code_name=code_name,
+            description=description,
+            sort_value=sort_value,
+            is_default=is_default,
+            is_disabled=is_disabled
+        )
+        account_type.save()
+        accounttypeid = account_type.id
+        print(accounttypeid)
+        if accounttypeid:
+            return {
+                "message": "Account Types added",
+                "success": True
+            }
+        else:
+            print("NO ACCOUNT TYPE ADDED")
+            return {
+                "message": "Account Types not added here",
+                "success": False
+            }
+
 
 class Goals:
     def __init__(self):
         self.help = Helper()
         
-    def createGoal(self, request,lang,user):
+    def createGoal(self, request, lang, user):
         current_datetime = datetime.datetime.now()
         goalname = request.data["goal_name"]
         goalperiod = request.data["goal_period"]
@@ -402,25 +483,32 @@ class Goals:
         deposittype = request.data["deposit_type"]
         dreminderday = request.data["deposit_reminder_day"]
         userid = request.user.id
-        goal = Goal.objects.create(
-            goal = goalname,
-            goal_period = goalperiod,
-            goal_amount = goalamount,
-            user=User(pk=int(userid)),
-            deposit_type = deposittype,
-            deposit_reminder_day = dreminderday
-        )
-        goal.save()
-        goalid = goal.id
-        goal = self.getGoalById(request,lang,goalid)
-        return{
-            "message": f"You have successfully created a goal to {goalname} of {goalamount} within {goalperiod} years",
-            "success": True,
-            "user_id":userid,
-            "goalid": goalid,
-            "goal": goal,
-            "time goal was created": current_datetime
-        }
+        is_verified = request.user.userprofile.is_verified
+        if is_verified is True:
+            goal = Goal.objects.create(
+                goal=goalname,
+                goal_period=goalperiod,
+                goal_amount=goalamount,
+                user=User(pk=int(userid)),
+                deposit_type=deposittype,
+                deposit_reminder_day=dreminderday
+            )
+            goal.save()
+            goalid = goal.id
+            goal = self.getGoalById(request, lang, goalid)
+            return {
+                "message": f"You have successfully created a goal to {goalname} of {goalamount} within {goalperiod} years",
+                "success": True,
+                "user_id": userid,
+                "goalid": goalid,
+                "goal": goal,
+                "time goal was created": current_datetime
+            }
+        else:
+            return {
+                "message": "your account is not verified, please check your email and verify",
+                "success": False
+            }
             
     def getGoalById(self, request,lang, goalid):
         if Goal.objects.filter(pk=goalid).exists():
@@ -735,6 +823,32 @@ class Withdraws:
                     "withdraw": wwithdraw,
                     "time withdraw was created": created,
                     "transaction":transactionid
+                }
+    def withdraws(self,request,lang,withdraw,user):
+        withdraw_channel = "bank"
+        withdraw_amount = withdraw["withdraw"]
+        userid = user["user_id"]
+        currency = "UGX"
+        account_type = "personal"
+        created = withdraw["date"]
+        account_type = "basic"
+        account_type = AccountType.objects.filter(code_name=account_type).get()
+        status = "successful"
+        withdraw = Withdraw.objects.create(
+                    withdraw_channel=withdraw_channel,
+                    withdraw_amount=float(withdraw_amount),
+                    currency=currency,
+                    account_type=account_type,
+                    user=User(pk=int(userid)),
+                    created=created,
+                    status=status
+                )
+        withdrawid = withdraw.id
+        withdraw.save()
+        wwithdraw = self.getWithdrawById(request,lang,withdrawid)
+        return{
+                    "message": f"ohhh yeah",
+                    "success": True
                 }
         
     def getAllWithdraws(self,request,lang,user):
