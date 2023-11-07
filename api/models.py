@@ -440,6 +440,7 @@ class Deposit(models.Model):
     reference = models.CharField(max_length=200, default="")
     reference_id = models.IntegerField(default=0)
     txRef = models.CharField(max_length=200)
+    networth = models.BigIntegerField(default=0)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.deposit_amount)
@@ -453,7 +454,7 @@ class Withdraw(models.Model):
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
     created = models.DateTimeField(auto_now_add=True)
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
-    transaction = models.ForeignKey(BankTransaction, on_delete=models.CASCADE)
+    transaction = models.ForeignKey(BankTransaction, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=200, default="")
 
     def __str__(self):

@@ -18,6 +18,7 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from api.helper import helper
 from api.config import webconfig
+# from ...config import webconfig
 from api.v1.mailer.Mailer import Mailer
 from api.v1.locale.Locale import Locale
 from api.models import *
@@ -35,7 +36,6 @@ from django.utils.encoding import force_bytes, force_str, DjangoUnicodeDecodeErr
 from api.helper.Cryptor import Cryptor
 import os
 import random
-
 
 # master module class
 # master module class
@@ -247,6 +247,16 @@ class Users:
                     "message": "",
                     "success": True,
                 }
+            )
+        return results
+    
+    def getAllUsersEmails(self, request, lang):
+        results = []
+        User = get_user_model()
+        users = User.objects.all()
+        for user in users:
+            results.append(
+                user.email
             )
         return results
 
@@ -592,6 +602,7 @@ class Users:
         username = user["email"]
         last_name = user["last_name"]
         password = user["password"]
+        is_deleted = False
         is_verified = user["profile"]["is_verified"]
         gender = user["profile"]["gender"]
         birth_date = user["profile"]["birth_date"]
@@ -615,6 +626,7 @@ class Users:
         uuser.userprofile.profile_picture = profile_picture
         uuser.userprofile.last_modified = current_datetime
         uuser.userprofile.is_verified = is_verified
+        uuser.userprofile.is_deleted = is_deleted
         uuser.save()
         userss = self.getAuthUserById(request, lang, userid)
         return {

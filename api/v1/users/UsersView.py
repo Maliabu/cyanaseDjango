@@ -41,8 +41,19 @@ class GetAllUsers(APIView):
     http_method_names = ['get']
 
     def get(self, request, lang, format=None):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         user = _user.getAllUsers(request, lang)
+        return Response(user)
+
+
+class GetAllUsersEmails(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang, format=None):
+        lang = DEFAULT_LANG if lang is None else lang
+        user = _user.getAllUsersEmails(request, lang)
         return Response(user)
 
 

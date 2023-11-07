@@ -116,17 +116,6 @@ DATABASES = {
     #     "NAME": BASE_DIR / "db.sqlite3",
     #     "sql_mode": "traditional",
     # },
-    # "default": {
-    #     "ENGINE": "django.db.backends.mysql",
-    #     "OPTIONS": {
-    #         "init_command": "ALTER DATABASE cyanase CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci",
-    #     },
-    #     "NAME": "cyanase",
-    #     "USER": "root",
-    #     "PASSWORD": "root",
-    #     "HOST": "127.0.0.1",
-    #     "PORT": "3306",
-    # },
     "default": {
         "ENGINE": "django.db.backends.mysql",
         "OPTIONS": {
@@ -135,9 +124,20 @@ DATABASES = {
         "NAME": "cyanase",
         "USER": "root",
         "PASSWORD": "root",
-        "HOST": "34.170.138.183",
+        "HOST": "127.0.0.1",
         "PORT": "3306",
     },
+    # "default": {
+    #     "ENGINE": "django.db.backends.mysql",
+    #     "OPTIONS": {
+    #         "init_command": "ALTER DATABASE cyanase CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci",
+    #     },
+    #     "NAME": "cyanase",
+    #     "USER": "root",
+    #     "PASSWORD": "root",
+    #     "HOST": "34.170.138.183",
+    #     "PORT": "3306",
+    # },
 #     "default": {
 #         "ENGINE": "django.db.backends.mysql",
 #         "OPTIONS": {

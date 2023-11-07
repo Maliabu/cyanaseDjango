@@ -1,6 +1,6 @@
 
 import datetime
-from .models import Deposit, AccountType, Goal, Subscription, Withdraw, RiskProfile
+from .models import Deposit, AccountType, Goal, Subscription, Withdraw, RiskProfile, Networth, NextOfKin
 from .helper.helper import Helper
 # from .v1.locale import Locale
 from django.contrib.auth.models import User
@@ -228,7 +228,7 @@ class Deposits:
                         "success": False
                     }
             
-    def getAllDeposits(self,request,lang,user):
+    def getAllDeposits(self, request, lang, user):
         deposits = []
         options = []
         dates = []
@@ -236,6 +236,7 @@ class Deposits:
         totalUGX = 0
         totalUSD = 0
         depo = []
+        totalNetworth = 0
         totalDepositUGX = 0
         totalDepositUSD = 0
         userid = request.user.id
@@ -243,9 +244,11 @@ class Deposits:
         for deposit in ddeposits:
             if deposit.user.id == userid:
                 amount = deposit.deposit_amount
+                networth = deposit.networth
                 currency = deposit.currency
                 if currency != "USD":
                     totalUGX += amount
+                    totalNetworth += networth
                 else:
                     totalUSD += amount
                     totalDepositAmount += amount
@@ -265,19 +268,18 @@ class Deposits:
             options.append(deposit.investment_option)
         goalDepositsUGX = Goals.getAllUserGoals(self,request,lang,user)[0]
         goalDepositUSD = Goals.getAllUserGoals(self,request,lang,user)[1]
-        
         totalDepositUGX = totalUGX - goalDepositsUGX
         totalDepositUSD = totalUSD - goalDepositUSD
         option = set(options)
         for item in option:
-            aamount = Deposit.objects.filter(investment_option=item)
-            for amount in aamount:
-                depo.append({"name":item, "datas":amount.deposit_amount/1000,"date":amount.created.strftime("%d %b")})
+            aamount = deposits
+            for amount in ddeposits:
+                depo.append({"name": amount.investment_option, "datas": amount.deposit_amount/1000,"date":amount.created.strftime("%d %b")})
                 dates.append(amount.created.strftime("%d %b"))
                 # dates.append((str(amount.created))[0:10])
         # myData = list({names["name"]:names for names in depo}.values())
         # deposits.sort(reverse=True)
-        return totalDepositUGX,totalDepositUSD,totalUGX,totalUSD,depo,dates,deposits,goalDepositsUGX
+        return totalDepositUGX, totalDepositUSD, totalUGX, totalUSD, depo, dates, deposits, goalDepositsUGX, options, totalNetworth
     
     def depositToGoal(self,request,lang,user,goalid,txRef):
         current_datetime = datetime.datetime.now()
@@ -851,7 +853,7 @@ class Withdraws:
                     "success": True
                 }
         
-    def getAllWithdraws(self,request,lang,user):
+    def getAllWithdraws(self, request, lang, user):
         wwithdraws = []
         total_withdraw = 0
         userid = request.user.id
@@ -859,17 +861,17 @@ class Withdraws:
         if withdraws.exists:
             for withdraw in withdraws:
                 withdrawid = withdraw.pk
-                total_withdraw+=withdraw.withdraw_amount
+                total_withdraw += withdraw.withdraw_amount
                 wwithdraws.append({
                     "withdarw_id": withdrawid,
-                    "withdraw_channel":withdraw.withdraw_channel,
-                    "withdraw_amount":withdraw.withdraw_amount,
-                    "currency":withdraw.currency,
-                    "account_type":withdraw.account_type.code_name,
-                    "status":withdraw.status,
-                    "created":withdraw.created
+                    "withdraw_channel": withdraw.withdraw_channel,
+                    "withdraw_amount": withdraw.withdraw_amount,
+                    "currency": withdraw.currency,
+                    "account_type": withdraw.account_type.code_name,
+                    "status": withdraw.status,
+                    "created": withdraw.created
                 })
-            return wwithdraws
+            return wwithdraws, total_withdraw
         else:
             return 0
     
@@ -1030,13 +1032,21 @@ class Networths:
         return totalDeposit
         
     def getGoalNetworth(self,request,lang,user):
+        #no goals networth
+        # userid = request.user.id
+        # networth = Networth.objects.filter(user_id=userid)
+        # total_networth = 0
+        # for nnetworth in networth:
+        #      total_networth += nnetworth.amount
+        # return total_networth
         no_goals = 0
         goals = 0
         userid = request.user.id
-        deposit = Deposit.objects.filter(user_id=userid)
-        for ddeposit in deposit:
-            goal = ddeposit
-            amount = ddeposit.deposit_amount
+        # deposit = Deposit.objects.filter(user_id=userid)
+        networth = Networth.objects.filter(user_id=userid)
+        for nnetworth in networth:
+            goal = nnetworth
+            amount = nnetworth.amount
             if goal.goal is None:
                 no_goals+=amount
             else:
