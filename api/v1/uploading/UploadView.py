@@ -197,20 +197,37 @@ class uploadVideoThumbnail(APIView):
             resize_image = image.resize((width, height))
             resize_image.save(path)
         os.remove(output)
-    
+
+
 class UploadPhoto(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
     
-    def post(self,request,lang):
+    def post(self, request, lang):
         photo = request.data['photo']
         userid = request.user.id
         if photo:
             # destination = 'media/profile/'
             # _upload.upload(destination,photo)
-            _user.UpdateProfilePhoto(request,lang,userid,photo)
+            _user.UpdateProfilePhoto(request, lang, userid, photo)
             return Response({"message": "Upload successful", "success": True})
         else:
             return Response({"message": "Incomplete request data", "success": False})
+
+
+class UploadFile(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
     
+    def post(self, request, lang):
+        moa = request.data['moa']
+        userid = request.user.id
+        if moa:
+            # destination = 'media/profile/'
+            # _upload.upload(destination,photo)
+            _user.UpdateProfilePhoto(request, lang, userid, moa)
+            return Response({"message": "Upload successful", "success": True})
+        else:
+            return Response({"message": "Incomplete request data", "success": False})

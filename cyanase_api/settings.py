@@ -104,7 +104,7 @@ EMAIL_HOST = "mail.cyanase.com"
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 EMAIL_HOST_USER = "support@cyanase.com"
-EMAIL_HOST_PASSWORD = "support@cyanase"
+EMAIL_HOST_PASSWORD = "?)PbtO=~Og5F"
 
 
 # # Database

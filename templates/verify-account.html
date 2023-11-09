@@ -8,7 +8,9 @@
     <title>Verify Account</title>
 </head>
 <body>
-    <div class="p-5 rounded-4">
+    {% load static %}
+<img src="{% static '/CI.png' %}" alt="My image" class="p-5">
+    <div class="p-5 rounded-4 bg-light">
         <h4>{{ message }}</h4>
         <h6>You can proceed to explore our services fully.</h6></div>
 </body>

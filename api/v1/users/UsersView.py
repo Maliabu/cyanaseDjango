@@ -288,24 +288,158 @@ class CreateAuthUser(ObtainAuthToken):
             })
         elif not gender:
             return Response({
-            'message': "Gender is required",
-            "type": "gender",
-            'success': False
+                'message': "Gender is required",
+                "type": "gender",
+                'success': False
             })
         elif not country:
             return Response({
-            'message': "Country is required",
-            "type": "country",
-            'success': False
+                'message': "Country is required",
+                "type": "country",
+                'success': False
             })
         elif not birth_date:
             return Response({
-            'message': "date of birth is required",
-            "type": "birth_date",
-            'success': False
+                'message': "date of birth is required",
+                "type": "birth_date",
+                'success': False
             })
         else:
             user = _user.createAuthUser(request, lang)
+            return Response(user)
+
+
+class CreateApiUser(ObtainAuthToken):
+    authentication_classes = ()
+    permission_classes = ()
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        first_name = request.data["first_name"]
+        email = request.data["email"]
+        if email:
+            username = email
+        last_name = request.data["last_name"]
+        password = request.data["password"]
+        confirmpassword = request.data["confirmpassword"]
+        company_category = request.data["company_category"]
+        user_type = request.data["user_type"]
+        phone_no = request.data["phone"]
+        country = request.data["country"]
+        moa = request.data["moa"]
+        coi = request.data["coi"]
+        ##########################
+        if not username:
+            return Response({
+                'message': "Email is required",
+                "type": "username",
+                'success': False
+            })
+        elif len(str(username)) < 3:
+            return Response({
+                'message': "Email must be greater than 3 characters",
+                "type": "username",
+                'success': False
+            })
+        elif _user.accountExists(request, username, lang):
+            return Response({
+                'message': "User already exists, please enter a unique email",
+                "type": "username",
+                'success': False
+            })
+        elif not email:
+            return Response({
+                'message': "Email is required",
+                "type": "email",
+                'success': False
+            })
+        elif not _helper.isEmailValid(email):
+            return Response({
+                'message': "Invalid email address",
+                "type": "email",
+                'success': False
+            })
+        elif _user.emailExists(request, lang, email):
+            return Response({
+                'message': f"Account with email address {email} already exists",
+                "type": "email",
+                'success': False
+            })
+        elif str(phone_no) and _user.phoneExists(request, lang, phone_no):
+            return Response({
+                'message': "Phone number already exists",
+                "type": "phone",
+                'success': False
+            })
+        elif not first_name:
+            return Response({
+                'message': "First name is required",
+                "type": "first_name",
+                'success': False
+            })
+        elif not last_name:
+            return Response({
+                'message': "Last name is required",
+                "type": "last_name",
+                'success': False
+            })
+        elif not password:
+            return Response({
+                'message': "Password is required",
+                "type": "password",
+                'success': False
+            })
+        elif password and len(password) < 6:
+            return Response({
+                'message': "Password is too short, must atleast 6 characters or above",
+                "type": "password",
+                'success': False
+            })
+        elif password and not confirmpassword:
+            return Response({
+                'message': "Please confirm your password",
+                "type": "confirm_password",
+                'success': False
+            })
+        elif password and not (confirmpassword == password):
+            return Response({
+                'message': "Passwords don't match",
+                "type": "password_1_2",
+                'success': False
+            })
+        elif not company_category:
+            return Response({
+                'message': "Company category is required",
+                "type": "gender",
+                'success': False
+            })
+        elif not country:
+            return Response({
+                'message': "Country is required",
+                "type": "country",
+                'success': False
+            })
+        elif not user_type:
+            return Response({
+                'message': "user type is required",
+                "type": "user_type",
+                'success': False
+            })
+        elif not moa:
+            return Response({
+                'message': "moa is required",
+                "type": "moa",
+                'success': False
+            })
+        elif not coi:
+            return Response({
+                'message': "coi is required",
+                "type": "coi",
+                'success': False
+            })
+        else:
+            user = _user.createApiUser(request, lang)
             return Response(user)
 
 

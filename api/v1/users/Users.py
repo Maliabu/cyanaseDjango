@@ -331,7 +331,7 @@ class Users:
 
     def createAuthUser(self, request, lang):
         current_datetime = datetime.datetime.now()
-        allusers = User.objects.all().count()
+        # allusers = User.objects.all().count()
         ##########################
         first_name = request.data["first_name"]
         email = request.data["email"]
@@ -340,7 +340,7 @@ class Users:
         # pkg_id = request.data["pkg_id"]
         last_name = request.data["last_name"]
         password = request.data["password"]
-        confirmpassword = request.data["confirmpassword"]
+        # confirmpassword = request.data["confirmpassword"]
         #### profile
         # default_language = self.locale.getDefaultLanguages(request, lang)
         profile = request.data["profile"]
@@ -406,6 +406,77 @@ class Users:
             "verificationcode": verificationcode,
         }
 
+    def createApiUser(self, request, lang):
+        current_datetime = datetime.datetime.now()
+        # allusers = User.objects.all().count()
+        first_name = request.data["first_name"]
+        email = request.data["email"]
+        if email:
+            username = email
+        last_name = request.data["last_name"]
+        password = request.data["password"]
+        company_category = request.data["company_category"]
+        user_type = request.data["user_type"]
+        country = request.data["country"]
+        phoneno = request.data["phone"]
+        logo = "default_logo.jpg"
+        verificationcode = str(self.help.getRandom())
+        # create user
+        user = User.objects.create_user(username, email, password)
+        user.first_name = first_name
+        user.last_name = last_name
+        user.is_superuser = False
+        user.is_staff = False
+        user.is_active = True
+        user.save()
+        # get saved user
+        userid = user.pk
+        moa = request.data["moa"]
+        if moa:
+            name = "moa"
+            self.UploadProfileFiles(request, lang, userid, name, moa)
+        coi = request.data["coi"]
+        if coi:
+            name = "coi"
+            self.UploadProfileFiles(request, lang, userid, name, coi)
+        # Get the user add update the available profile data
+        uuser = User.objects.get(pk=userid)
+        uuser.userprofile.company_category = None if not company_category else company_category
+        uuser.userprofile.phoneno = None if not phoneno else phoneno
+        uuser.userprofile.user_type = None if not user_type else user_type
+        uuser.userprofile.country = None if not country else country
+        uuser.userprofile.verification_code = verificationcode
+        uuser.userprofile.logo = logo
+        uuser.userprofile.last_modified = current_datetime
+        uuser.userprofile.moa = moa
+        uuser.userprofile.coi = coi
+        uuser.save()
+        # get Token
+        #############
+        user = self.getAuthUserById(request, lang, userid)
+        current_site = get_current_site(request)
+        ###############
+        encrypted_verification_code = self.cryptor.encrypt(verificationcode)
+        encrypted_userid = self.cryptor.encrypt(userid)
+        content = self.mailer.getEMailTemplateContent(
+            "verify_account_email_template.html",
+            {
+                "user": user,
+                "encrypted_verification_code": encrypted_verification_code,
+                "encrypted_userid": encrypted_userid,
+                "verificationcode": verificationcode,
+                "domain": current_site,
+            },
+        )
+        #######################################
+        self.mailer.sendHTMLEmail(email, "Please verify your account", content)
+        return {
+            "message": f"Your Account has been created successfuly, please take time and verify it with the link sent to {email} or use verification code {verificationcode}",
+            "success": True,
+            "user": user,
+            "verificationcode": verificationcode,
+        }
+    
     def UpdateUserPhoneNumber(self, request, lang, userid, phone_number):
         UserProfile.objects.filter(user=User(pk=int(userid))).update(
             phoneno=phone_number
@@ -418,7 +489,6 @@ class Users:
         output = 'profile_picture'+user_id+name_id+'.jpg'
         #########################
         # let us first delete the other photos of this user before updating a new one
-        
         old_profile_pictures = UserProfile.objects.filter(user=User(pk=int(userid))).get()
         old_picture = old_profile_pictures.profile_picture
         old_picture_name = old_picture.name
@@ -439,6 +509,23 @@ class Users:
             destination.close()
             UserProfile.objects.filter(user=User(pk=int(userid))).update(
                 profile_picture=output
+            )
+
+    def UploadProfileFiles(self, request, lang, userid, fieldname, filename):
+        api_user = User.objects.get(pk=userid)
+        name_id = api_user.first_name
+        output = fieldname+name_id+'.pdf'
+        destination = open('media/file/'+output, 'wb+')
+        for chunk in filename.chunks():
+            destination.write(chunk)
+        destination.close()
+        if fieldname == "moa":
+            UserProfile.objects.filter(user=User(pk=int(userid))).update(
+                moa=output
+            )
+        else:
+            UserProfile.objects.filter(user=User(pk=int(userid))).update(
+                coi=output
             )
 
     def ResendVerificationCode(self, request, lang, email):
@@ -595,7 +682,7 @@ class Users:
         user.delete()
         return True
     
-    def onboardUsers(self, request, lang,user):
+    def onboardUsers(self, request, lang, user):
         current_datetime = user["profile"]["created"]
         first_name = user["first_name"]
         email = user["email"]

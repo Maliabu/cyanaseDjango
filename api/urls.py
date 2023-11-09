@@ -40,6 +40,8 @@ urlpatterns = [
     path('', views.index.as_view(), name="index"),
     path('<str:lang>/register/user/',
          user_view.CreateAuthUser.as_view(), name="register-user"),
+    path('<str:lang>/register/api/user/',
+         user_view.CreateApiUser.as_view(), name="register-api-user"),
     path('<str:lang>/make/deposit/',
          views.MakeDeposit.as_view(), name="make-deposit"),
     path('<str:lang>/make/card/deposit/',
