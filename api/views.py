@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from .v1.users.Users import Users
-from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths, BankTransactions, Subscriptions, TransactionRef, AccountTypes
+from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths, BankTransactions, Subscriptions, TransactionRef, AccountTypes, InvestmentOptions
 from django.contrib.auth.models import User
 from rave_python import Rave, RaveExceptions,Misc
 import os
@@ -31,6 +31,7 @@ _transaction = BankTransactions()
 _subscription = Subscriptions()
 _refs = TransactionRef()
 _accountType = AccountTypes()
+_investmentOption = InvestmentOptions()
 
 
 class index(APIView):
@@ -132,16 +133,18 @@ class MakeDeposit(APIView):
     http_method_names = ['post']
 
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
         deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
+        investment_id = request.data["investment_id"]
         investment_option = request.data["investment_option"]
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
         user = _user.getAuthUser(request, lang)
+        userid = user["user_id"]
         ##########################
         if not payment_means:
             return Response({
@@ -191,24 +194,55 @@ class MakeDeposit(APIView):
                 "type": "reference_id",
                 'success': False
             })
+        elif not investment_id:
+            return Response({
+                'message': "This field is required",
+                "type": "investment_id",
+                'success': False
+            })
         else:
-            # providers = _deposit.getLinkingProviders
-            # print(providers)
-            transaction_id = str(reference_id)
-            verified = _deposit.verifyTransaction(transaction_id)
-            if verified == "success":
-                txRef = _refs.getTxRef()
-                tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
-                if tx_ref["success"] is False:
-                    deposit = _deposit.createDeposit(request, lang, txRef)
-                    return Response(deposit)
-                if tx_ref["success"] is True:
+            if int(investment_id) != 0:
+                investment = _investmentOption.getInvestmentOptionById(request, lang, userid, investment_id, deposit_amount)
+                # providers = _deposit.getLinkingProviders
+                # print(providers)
+                transaction_id = str(reference_id)
+                verified = _deposit.verifyTransaction(transaction_id)
+                if verified == "success":
+                    txRef = _refs.getTxRef()
+                    tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
+                    if tx_ref["success"] is False:
+                        deposit = _deposit.createDeposit(request, lang, txRef, investment, investment_id)
+                        return Response(deposit)
+                    if tx_ref["success"] is True:
+                        return Response({
+                            'message': "Something went wrong. Deposit unsuccessful",
+                            'success': False
+                        })
+                else:
                     return Response({
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
             else:
-                return Response({
+                investments = _riskprofile.getInvestmentByRiskProfile(request, lang, user)
+                # providers = _deposit.getLinkingProviders
+                # print(providers)
+                transaction_id = str(reference_id)
+                verified = _deposit.verifyTransaction(transaction_id)
+                if verified == "success":
+                    txRef = _refs.getTxRef()
+                    tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
+                    if tx_ref["success"] is False:
+                        for investment in investments:
+                            deposit = _deposit.createDeposit(request, lang, txRef, investment, investment_id)
+                        return Response(deposit)
+                    if tx_ref["success"] is True:
+                        return Response({
+                            'message': "Something went wrong. Deposit unsuccessful",
+                            'success': False
+                        })
+                else:
+                    return Response({
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
                     })
@@ -220,7 +254,7 @@ class MakeDepositToBank(APIView):
     http_method_names = ['post']
 
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
         deposit_amount = request.data["deposit_amount"]
@@ -295,7 +329,7 @@ class MakeDepositToBank(APIView):
             })
         else:
             transactions = []
-            rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+            rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
             payload = {
                 "cardno": cardno,
                 "cvv": cvv,
@@ -353,12 +387,11 @@ class MakeDepositToGoal(APIView):
     http_method_names = ['post']
 
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
         deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
-        investment_option = request.data["investment_option"]
         account_type = request.data["account_type"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
@@ -382,12 +415,6 @@ class MakeDepositToGoal(APIView):
             return Response({
                 'message': "This field is required",
                 "type": "deposit_category",
-                'success': False
-            })
-        elif not investment_option:
-            return Response({
-                'message': "This field is required",
-                "type": "investment_option",
                 'success': False
             })
         elif not deposit_amount:
@@ -425,11 +452,11 @@ class MakeDepositToGoal(APIView):
             verified = _deposit.verifyTransaction(transaction_id)
             if verified == "success":
                 txRef = _refs.getTxRef()
-                tx_ref = _deposit.getTxRefById(request,lang,user,txRef)
-                if tx_ref["success"] == False:
-                    deposit = _deposit.depositToGoal(request, lang, user,goalid,txRef)
+                tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
+                if tx_ref["success"] is False:
+                    deposit = _deposit.depositToGoal(request, lang, user, goalid, txRef)
                     return Response(deposit)
-                if tx_ref["success"] == True:
+                if tx_ref["success"] is True:
                     return Response({
                         'message': "Something went wrong. Deposit unsuccessful",
                         'success': False
@@ -440,54 +467,58 @@ class MakeDepositToGoal(APIView):
                         'success': False
                     })
 
+
 class GetDepositsByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang):
+
+    def get(self, request, lang):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
-        lang = DEFAULT_LANG if lang == None else lang
-        deposit = _deposit.getAllDeposits(request,lang,user)
+        lang = DEFAULT_LANG if lang is None else lang
+        deposit = _deposit.getAllDeposits(request, lang, user)
         return Response(deposit)
+
 
 class GetDepositsById(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang,depositid=34):
-        lang = DEFAULT_LANG if lang == None else lang
-        deposit = _deposit.getDeopsitById(request,lang,depositid)
+
+    def get(self, request, lang, depositid=34):
+        lang = DEFAULT_LANG if lang is None else lang
+        deposit = _deposit.getDeopsitById(request, lang, depositid)
         return Response(deposit)
+
 
 class GetDepositsByGoalId(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang,goalid=16):
-        lang = DEFAULT_LANG if lang == None else lang
-        deposit = _deposit.getDeopsitByGoalId(request,lang,goalid)
+
+    def get(self, request, lang, goalid=16):
+        lang = DEFAULT_LANG if lang is None else lang
+        deposit = _deposit.getDeopsitByGoalId(request, lang, goalid)
         return Response(deposit)
+
 
 class GetGoalById(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang,goalid):
-        lang = DEFAULT_LANG if lang == None else lang
-        goal = _goal.getGoalById(request,lang,goalid)
+
+    def get(self, request, lang, goalid):
+        lang = DEFAULT_LANG if lang is None else lang
+        goal = _goal.getGoalById(request, lang, goalid)
         return Response(goal)
-    
-    
+
+
 class CreateGoal(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang, *args, **kwargs):
         user = _user.getAuthUser(request, lang)
         lang = DEFAULT_LANG if lang is None else lang
@@ -608,63 +639,65 @@ class CreateGoal(APIView):
             #             'success': False
             #         })
 
+
 class GetGoalsByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang):
+
+    def get(self, request, lang):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
-        lang = DEFAULT_LANG if lang == None else lang
-        goal = _goal.getAllUserGoals(request,lang,user)
+        lang = DEFAULT_LANG if lang is None else lang
+        goal = _goal.getAllUserGoals(request, lang, user)
         return Response(goal)
-    
+
+
 class AddNextOfKin(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
-    def post(self,request,lang,*args, **kwargs):
-        user = _user.getAuthUser(request,lang)
-        lang = DEFAULT_LANG if lang == None else lang
+
+    def post(self, request, lang, *args, **kwargs):
+        user = _user.getAuthUser(request, lang)
+        lang = DEFAULT_LANG if lang is None else lang
         first_name = request.data["first_name"]
         last_name = request.data["last_name"]
         email = request.data["email"]
         phone = request.data["phone"]
-        
         if not first_name:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not last_name:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not email:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not phone:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         else:
-            nextOfKin = _nextOfKin.addNextOfKin(request,lang,user)
+            nextOfKin = _nextOfKin.addNextOfKin(request, lang, user)
             return Response(nextOfKin)
-        
+
+
 class GetNextOfKinById(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang,nextOfKinId):
-        lang = DEFAULT_LANG if lang == None else lang
-        nextOfKin = _nextOfKin.getNextOfKinById(request,lang,nextOfKinId)
+
+    def get(self, request, lang, nextOfKinId):
+        lang = DEFAULT_LANG if lang is None else lang
+        nextOfKin = _nextOfKin.getNextOfKinById(request, lang, nextOfKinId)
         return Response(nextOfKin)
 
 
@@ -672,22 +705,22 @@ class GetNextOfKin(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
+
     def get(self, request, lang):
         lang = DEFAULT_LANG if lang is None else lang
         user = _user.getAuthUser(request, lang)
         nextOfKin = _nextOfKin.getNextOfKin(request, lang, user)
         return Response(nextOfKin)
-    
+
 
 class AddRiskProfile(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
-    def post(self,request,lang,*args, **kwargs):
-        user = _user.getAuthUser(request,lang)
-        lang = DEFAULT_LANG if lang == None else lang
+
+    def post(self, request, lang, *args, **kwargs):
+        user = _user.getAuthUser(request, lang)
+        lang = DEFAULT_LANG if lang is None else lang
         qn1 = request.data["qn1"]
         qn2 = request.data["qn2"]
         qn3 = request.data["qn3"]
@@ -703,90 +736,101 @@ class AddRiskProfile(APIView):
         investment_option = request.data["investment_option"]
         risk_analysis = request.data["risk_analysis"]
         if not qn1:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn2:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn3:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn4:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn5:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn6:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn7:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn8:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn9:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn10:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not qn11:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False
             }
         elif not risk_analysis:
-            return{
+            return {
+                "message": "This field is required",
+                "success": False
+            }
+        elif not score:
+            return {
+                "message": "This field is required",
+                "success": False
+            }
+        elif not investment_option:
+            return {
                 "message": "This field is required",
                 "success": False
             }
         else:
-            riskprofile = _riskprofile.addRiskProfile(request,lang,user)
+            riskprofile = _riskprofile.addRiskProfile(request, lang, user)
             return Response(riskprofile)
-        
+
+
 class GetRiskProfile(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang):
-        lang = DEFAULT_LANG if lang == None else lang
-        user = _user.getAuthUser(request,lang)
-        riskprofile = _riskprofile.getRiskProfile(request,lang,user)
+
+    def get(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
+        user = _user.getAuthUser(request, lang)
+        riskprofile = _riskprofile.getRiskProfile(request, lang, user)
         return Response(riskprofile)
-    
+
 
 class MakeWithdrawFromBank(APIView):
-    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang, *args, **kwargs):
-        user = _user.getAuthUser(request,lang)
+        user = _user.getAuthUser(request, lang)
         userid = user["user_id"]
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         currency = request.data["currency"]
@@ -796,9 +840,9 @@ class MakeWithdrawFromBank(APIView):
         narration = "Withdraw"
         beneficiary_name = request.data["beneficiary_name"]
         is_verified = request.user.userprofile.is_verified
-        is_subscribed = _subscription.getSubscriptionStatus(request,lang,userid)
+        is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw channel"
@@ -810,7 +854,7 @@ class MakeWithdrawFromBank(APIView):
                 'success': False
             })
         elif not withdraw_amount:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw amount"
@@ -847,11 +891,11 @@ class MakeWithdrawFromBank(APIView):
                         _type = "account"
                     if withdraw_channel == "mobile money":
                         _type = "mobilemoney"
-                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                    getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
                     total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
                     transactions = []
                     try:
-                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
 
                         res = rave.Transfer.initiate({
                             "account_bank": account_bank,
@@ -878,7 +922,6 @@ class MakeWithdrawFromBank(APIView):
 
                     except RaveExceptions.ServerError as e:
                         print(e.err)
-                    print(transactions)
                     if transactions[0]["error"] is False:
                         transaction = _transaction.createTransfer(request, lang, transactions)
                         transactionid = transaction["transaction_id"]
@@ -887,8 +930,6 @@ class MakeWithdrawFromBank(APIView):
                 else:
                     substatus = is_subscribed["status"]
                     time_left = is_subscribed["days_passed"]
-                    print(substatus)
-                    print(time_left)
                     return Response({
                         "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
                         "success": False
@@ -901,14 +942,14 @@ class MakeWithdrawFromBank(APIView):
 
 
 class MakeGoalWithdrawFromBank(APIView):
-    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang, *args, **kwargs):
-        user = _user.getAuthUser(request,lang)
+        user = _user.getAuthUser(request, lang)
         userid = user["user_id"]
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         currency = request.data["currency"]
@@ -919,9 +960,9 @@ class MakeGoalWithdrawFromBank(APIView):
         narration = "Withdraw"
         beneficiary_name = request.data["beneficiary_name"]
         is_verified = request.user.userprofile.is_verified
-        is_subscribed = _subscription.getSubscriptionStatus(request,lang,userid)
+        is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw channel"
@@ -933,7 +974,7 @@ class MakeGoalWithdrawFromBank(APIView):
                 'success': False
             })
         elif not withdraw_amount:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw amount"
@@ -972,18 +1013,18 @@ class MakeGoalWithdrawFromBank(APIView):
             if is_verified is True:
                 if is_subscribed["status"] == "subscribed":
                     # check goal status
-                    goal_status = _goal.getGoalById(request,lang,goalid)
-                    if goal_status["is_active"] == False:
+                    goal_status = _goal.getGoalById(request, lang, goalid)
+                    if goal_status["is_active"] is False:
                         _type = ""
                         if withdraw_channel == "bank":
                             _type = "account"
                         if withdraw_channel == "mobile money":
                             _type = "mobilemoney"
-                        getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                        getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
                         total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
                         transactions = []
                         try:
-                            rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+                            rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
 
                             res = rave.Transfer.initiate({
                                 "account_bank": account_bank,
@@ -1035,18 +1076,19 @@ class MakeGoalWithdrawFromBank(APIView):
                     "success": False
                 })
 
+
 class GetWithdrawFee(APIView):
-    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
-    def post(self,request,lang, *args, **kwargs):
+
+    def post(self, request, lang, *args, **kwargs):
         userid = request.user.id
         withdraw_amount = request.data["withdraw_amount"]
         currency = request.data["currency"]
         _type = request.data["type"]
         if not currency:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "currency"
@@ -1058,24 +1100,25 @@ class GetWithdrawFee(APIView):
                 'success': False
             })
         elif not withdraw_amount:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw amount"
             }
         else:
-            withdraw_fee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+            withdraw_fee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
             return Response(withdraw_fee)
 
+
 class MakeWithdrawFromMobileMoney(APIView):
-    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang, *args, **kwargs):
-        user = _user.getAuthUser(request,lang)
+        user = _user.getAuthUser(request, lang)
         userid = user["user_id"]
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         currency = request.data["currency"]
@@ -1084,15 +1127,15 @@ class MakeWithdrawFromMobileMoney(APIView):
         account_number = request.data["account_number"]
         beneficiary_name = request.data["beneficiary_name"]
         is_verified = request.user.userprofile.is_verified
-        is_subscribed = _subscription.getSubscriptionStatus(request,lang,userid)
+        is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw channel"
             }
         elif not withdraw_amount:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw amount"
@@ -1135,10 +1178,10 @@ class MakeWithdrawFromMobileMoney(APIView):
                         _type = "account"
                     if withdraw_channel == "mobile money":
                         _type = "mobilemoney"
-                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                    getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
                     total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
                     transactions = []
-                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
 
                     details = {
                             "account_bank": account_bank,
@@ -1146,7 +1189,7 @@ class MakeWithdrawFromMobileMoney(APIView):
                             "amount": total_withdraw,
                             "currency": currency,
                             "beneficiary_name": beneficiary_name,
-                                "meta": {
+                            "meta": {
                                 "sender": "Flutterwave Developers",
                                 "sender_country": "ZA",
                                 "mobile_number": "23457558595"
@@ -1155,9 +1198,9 @@ class MakeWithdrawFromMobileMoney(APIView):
                     res = rave.Transfer.initiate(details)
                     transactions.append(res)
                     if transactions[0]["error"] is False:
-                        transaction = _transaction.createTransfer(request,lang,transactions)
+                        transaction = _transaction.createTransfer(request, lang, transactions)
                         transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdraw(request,lang,user,transactionid)
+                        withdraw = _withdraw.withdraw(request, lang, user, transactionid)
                         return Response(withdraw)
                 else:
                     return Response({
@@ -1169,17 +1212,17 @@ class MakeWithdrawFromMobileMoney(APIView):
                     "message": "your account is not verified, please check your email and verify",
                     "success": False
                 })
-                
-                
+
+
 class MakeGoalWithdrawFromMobileMoney(APIView):
-    authentication_classes = [SessionAuthentication,TokenAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang, *args, **kwargs):
-        user = _user.getAuthUser(request,lang)
+        user = _user.getAuthUser(request, lang)
         userid = user["user_id"]
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         currency = request.data["currency"]
@@ -1189,15 +1232,15 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
         account_number = request.data["account_number"]
         beneficiary_name = request.data["beneficiary_name"]
         is_verified = request.user.userprofile.is_verified
-        is_subscribed = _subscription.getSubscriptionStatus(request,lang,userid)
+        is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw channel"
             }
         elif not withdraw_amount:
-            return{
+            return {
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw amount"
@@ -1246,10 +1289,10 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                         _type = "account"
                     if withdraw_channel == "mobile money":
                         _type = "mobilemoney"
-                    getWithdrawFee = _withdraw.getWithdrawfee(request,lang,userid,withdraw_amount,currency,_type)
+                    getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency,_type)
                     total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
                     transactions = []
-                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv = False)
+                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
 
                     details = {
                             "account_bank": account_bank,
@@ -1257,7 +1300,7 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                             "amount": total_withdraw,
                             "currency": currency,
                             "beneficiary_name": beneficiary_name,
-                                "meta": {
+                            "meta": {
                                 "sender": "Flutterwave Developers",
                                 "sender_country": "ZA",
                                 "mobile_number": "23457558595"
@@ -1266,9 +1309,9 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                     res = rave.Transfer.initiate(details)
                     transactions.append(res)
                     if transactions[0]["error"] is False:
-                        transaction = _transaction.createTransfer(request,lang,transactions)
+                        transaction = _transaction.createTransfer(request, lang, transactions)
                         transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdrawFromGoal(request,lang,goalid,user,transactionid)
+                        withdraw = _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid)
                         return Response(withdraw)
                 else:
                     return Response({
@@ -1281,109 +1324,169 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                     "success": False
                 })
 
+
 class GetWithdrawsByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
+
     def get(self, request, lang):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
         lang = DEFAULT_LANG if lang is None else lang
         withdraw = _withdraw.getAllWithdraws(request, lang, user)
         return Response(withdraw)
-    
+
+
+class GetInvestmentOption(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang):
+        userid = request.user.id
+        lang = DEFAULT_LANG if lang is None else lang
+        options = _investmentOption.getInvestmentOptions(request, lang, userid)
+        return Response(options)
+
+
+class GetInvestmentOptionByName(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        investment_option = request.data
+        userid = request.user.id
+        lang = DEFAULT_LANG if lang is None else lang
+        options = _investmentOption.getInvestmentOptionByName(request, lang, userid, option=investment_option)
+        return Response(options)
+
+
+class GetInvestmentOptionById(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        investment_id = request.data["investment_id"]
+        deposit_amount = request.data["deposit_amount"]
+        userid = request.user.id
+        if not investment_id:
+            return {
+                "message": "This field is required",
+                "success": False,
+                "type": "investment option id"
+            }
+        elif not deposit_amount:
+            return {
+                "message": "This field is required",
+                "success": False,
+                "type": "deposit amount"
+            }
+        lang = DEFAULT_LANG if lang is None else lang
+        options = _investmentOption.getInvestmentOptionById(request, lang, userid, investment_id, deposit_amount)
+        return Response(options)
+
+
 class GetTotalWithdrawByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang):
+
+    def get(self, request, lang):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
-        lang = DEFAULT_LANG if lang == None else lang
-        withdraw = _withdraw.getAllTotalWithdraws(request,lang,user)
+        lang = DEFAULT_LANG if lang is None else lang
+        withdraw = _withdraw.getAllTotalWithdraws(request, lang, user)
         return Response(withdraw)
-    
+
+
 class GetPendingWithdrawsByAuthUser(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang):
+
+    def get(self, request, lang):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
-        lang = DEFAULT_LANG if lang == None else lang
-        withdraw = _withdraw.getAllPendingWithdraws(request,lang,user)
+        lang = DEFAULT_LANG if lang is None else lang
+        withdraw = _withdraw.getAllPendingWithdraws(request, lang, user)
         return Response(withdraw)
-    
+
+
 class GetWithdrawNetworths(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang):
+
+    def get(self, request, lang):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
-        lang = DEFAULT_LANG if lang == None else lang
-        withdraw = _withdraw.getWithdrawNetworths(request,lang,user)
+        lang = DEFAULT_LANG if lang is None else lang
+        withdraw = _withdraw.getWithdrawNetworths(request, lang, user)
         return Response(withdraw)
+
 
 class GetWithdrawsById(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang,withdrawid):
-        lang = DEFAULT_LANG if lang == None else lang
-        withdraw = _withdraw.getWithdrawById(request,lang,withdrawid)
-        return Response(withdrawid)
-    
+
+    def get(self, request, lang, withdrawid):
+        lang = DEFAULT_LANG if lang is None else lang
+        withdraw = _withdraw.getWithdrawById(request, lang, withdrawid)
+        return Response(withdraw)
+
+
 class GetNetworth(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang,user):
-        lang = DEFAULT_LANG if lang == None else lang
-        networth = _networth.getNetworth(request,lang)
+
+    def get(self, request, lang, user):
+        lang = DEFAULT_LANG if lang is None else lang
+        networth = _networth.getNetworth(request, lang)
         return Response(networth)
-    
+
+
 class GetGoalNetworth(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
+
     def get(self, request, lang):
         lang = DEFAULT_LANG if lang is None else lang
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
         networth = _networth.getGoalNetworth(request, lang, user)
         return Response(networth)
-    
+
+
 class GetSubscriptionStatus(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['get']
-    
-    def get(self,request,lang):
-        lang = DEFAULT_LANG if lang == None else lang
+
+    def get(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
         userid = request.user.id
-        subscription = _subscription.getSubscriptionStatus(request,lang,userid)
+        subscription = _subscription.getSubscriptionStatus(request, lang, userid)
         return Response(subscription)
+
 
 class Subscribe(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang, *args, **kwargs):
-        user = _user.getAuthUser(request,lang)
+        user = _user.getAuthUser(request, lang)
         userid = user["user_id"]
         reference = request.data["reference"]
         reference_id = request.data["reference_id"]
         amount = request.data["amount"]
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         txRef = request.data["tx_ref"]
         if not txRef:
             return Response({
@@ -1412,17 +1515,17 @@ class Subscribe(APIView):
         else:
             txRef = _refs.getTxRef()
             print(txRef)
-            subscribe = _subscription.subscribe(request,lang,userid,txRef)
+            subscribe = _subscription.subscribe(request, lang, userid, txRef)
             return Response(subscribe)
-        
-        
+
+
 #######################################
 # deposit data set
 class DepositDataSet(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, *args, **kwargs):
         data_set = request.data
         if not data_set:
@@ -1433,12 +1536,13 @@ class DepositDataSet(APIView):
         else:
             for data in data_set:
                 date = data["date"]
-                year = datetime.datetime.strptime(date,"%Y-%m-%d")
+                year = datetime.datetime.strptime(date, "%Y-%m-%d")
                 month = year.strftime("%b")
                 new_year = year.strftime("%Y")
                 data["date"] = new_year
                 data["updated"] = month
             return Response(data_set)
+
 
 class OnboardAuthUsersDeposits(ObtainAuthToken):
     authentication_classes = ()
@@ -1446,7 +1550,7 @@ class OnboardAuthUsersDeposits(ObtainAuthToken):
     http_method_names = ['post']
 
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         deposits = request.data
         if len(deposits) <= 0:
             return Response({
@@ -1463,23 +1567,24 @@ class OnboardAuthUsersDeposits(ObtainAuthToken):
                     })
                 else:
                     email = deposit["email"]
-                    user = _user.getAuthUserByEmail(request,lang,email)
+                    user = _user.getAuthUserByEmail(request, lang, email)
                     print(user)
-                    _deposit.createDeposits(request,lang,deposit,user)
+                    _deposit.createDeposits(request, lang, deposit, user)
             number = len(deposits)
             return Response({
                 "users": number,
-                "message":"These users have their deposits in order",
-                "success":True
+                "message": "These users have their deposits in order",
+                "success": True
             })
-            
+
+
 class OnboardAuthUsersWithdraws(ObtainAuthToken):
     authentication_classes = ()
     permission_classes = ()
     http_method_names = ['post']
 
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         withdraws = request.data
         if len(withdraws) <= 0:
             return Response({
@@ -1496,12 +1601,12 @@ class OnboardAuthUsersWithdraws(ObtainAuthToken):
                     })
                 else:
                     email = withdraw["email"]
-                    user = _user.getAuthUserByEmail(request,lang,email)
+                    user = _user.getAuthUserByEmail(request, lang, email)
                     print(user)
-                    _withdraw.withdraws(request,lang,withdraw,user)
+                    _withdraw.withdraws(request, lang, withdraw, user)
             number = len(withdraws)
             return Response({
                 "users": number,
-                "message":"These users have their withdraws in order",
-                "success":True
+                "message": "These users have their withdraws in order",
+                "success": True
             })

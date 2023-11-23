@@ -2,8 +2,8 @@ from django.utils import timezone
 
 IS_LOCAL_HOST = False
 
-API_URL  = "http://127.0.0.1:8000/api/v1/" if IS_LOCAL_HOST else "https://cyanase.lol/api/v1/"
-BASE_URL = "http://127.0.0.1:8000/" if IS_LOCAL_HOST else "https://cyanase.lol/"
+API_URL  = "http://127.0.0.1:8000/api/v1/" if IS_LOCAL_HOST else "https://server.cyanase.lol/api/v1/"
+BASE_URL = "http://127.0.0.1:8000/" if IS_LOCAL_HOST else "https://server.cyanase.lol/"
 
 ID_ENCRYPTION_KEY = "ADB-KJQ-FZY-TQYJ"
 

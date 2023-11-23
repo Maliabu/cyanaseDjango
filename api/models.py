@@ -119,6 +119,20 @@ class NextOfKin(models.Model):
         return "%s" % self.first_name
 
 
+class RiskAnalysis(models.Model):
+    name = models.CharField(max_length=200, null=True, blank=True)
+    cash = models.IntegerField(default=0)
+    credit = models.IntegerField(default=0)
+    venture = models.IntegerField(default=0)
+    absolute_return = models.IntegerField(default=0)
+    score_min = models.IntegerField(default=0)
+    score_max = models.IntegerField(default=0)
+    created = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return "%s" % self.name
+
+
 class RiskProfile(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     qn1 = models.CharField(max_length=200, default="saving", verbose_name="objectives")
@@ -148,9 +162,7 @@ class RiskProfile(models.Model):
     )
     created = models.DateTimeField(auto_now_add=True)
     score = models.IntegerField(verbose_name="score", default=0)
-    risk_analysis = models.CharField(
-        max_length=200, verbose_name="analysis", default="Incomplete Risk profile"
-    )
+    risk_analysis = models.ForeignKey(RiskAnalysis, on_delete=models.CASCADE, null=True, blank=True)
     investment_option = models.CharField(
         max_length=200,
         verbose_name="investment option",
@@ -431,21 +443,94 @@ class Goal(models.Model):
     def __str__(self):
         return "%s - %s - %s" % (self.user, self.goal, self.goal_amount)
 
+    
+class FundManager(models.Model):
+    type = models.CharField(max_length=200, default="fundmanager", null=True)
+    country = models.CharField(max_length=200, blank=True, null=True)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    bio = models.CharField(max_length=255, null=True, blank=True)
+    company_profile = models.CharField(max_length=255, null=True, blank=True)
+    phoneno = models.CharField(max_length=255, null=True, blank=True)
+    email = models.EmailField(max_length=30, null=True, blank=True)
+    password = models.CharField(max_length=255, null=True, blank=True)
+    is_verified = models.BooleanField(default=0)
+    bankname = models.CharField(max_length=255, null=True, blank=True)
+    banknumber = models.CharField(max_length=255, null=True, blank=True)
+    bankbranch = models.CharField(max_length=255, null=True, blank=True)
+    bankaccname = models.CharField(max_length=255, null=True, blank=True)
+    profile_picture = models.ImageField(
+        upload_to="profile", default="default_picture.jpg"
+    )
+    created = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return "%s" % self.name
+
+    
+class InvestmentClass(models.Model):
+    name = models.CharField(max_length=255, null=True, blank=True)
+    code = models.CharField(max_length=255, null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return "%s" % self.name
+
+
+class InvestmentOption(models.Model):
+    name = models.CharField(max_length=255, null=True, blank=True)
+    class_type = models.ForeignKey(InvestmentClass, on_delete=models.CASCADE, null=True, blank=True)
+    fund_manager = models.ForeignKey(FundManager, on_delete=models.CASCADE)
+    minimum = models.BigIntegerField(default=0)
+    interest = models.IntegerField(default=0)
+    status = models.BooleanField(default=0)
+    units = models.BigIntegerField(default=0)
+    fund = models.CharField(max_length=200, null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return "%s" % self.name
+
+
+class InvestmentPerformance(models.Model):
+    investment_option = models.ForeignKey(InvestmentOption, on_delete=models.CASCADE, null=True, blank=True)
+    fund_manager = models.ForeignKey(FundManager, on_delete=models.CASCADE, null=True, blank=True)
+    bought = models.BigIntegerField(default=0)
+    selling = models.BigIntegerField(default=0)
+    performance_value = models.IntegerField(default=0)
+    units = models.BigIntegerField(default=0)
+    status = models.BooleanField(default=False)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return "%s %d" % self.class_id % self.performance_value
+
+
+class FundWithdraw(models.Model):
+    fund_manager_id = models.ForeignKey(FundManager, on_delete=models.CASCADE)
+    withdarw_amount = models.BigIntegerField(default=0)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return "%s %d" % self.fund_manager_id % self.withdarw_amount
+
 
 class Deposit(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    investment_option = models.ForeignKey(InvestmentOption, on_delete=models.CASCADE, null=True, blank=True)
     payment_means = models.CharField(max_length=200, null=True)
     deposit_category = models.CharField(max_length=200, null=True)
     deposit_amount = models.BigIntegerField(default=0)
     currency = models.CharField(max_length=200, default="UGX")
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
-    investment_option = models.CharField(max_length=200, default="risk_analysis")
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     reference = models.CharField(max_length=200, default="")
     reference_id = models.IntegerField(default=0)
     txRef = models.CharField(max_length=200)
     networth = models.BigIntegerField(default=0)
+    available = models.BooleanField(default=0)
+    updated = models.DateTimeField(null=True, blank=True)
+    units = models.BigIntegerField(default=0)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.deposit_amount)
