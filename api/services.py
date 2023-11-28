@@ -1150,7 +1150,7 @@ class Withdraws:
                 })
             return wwithdraws, total_withdraw
         else:
-            return 0
+            return [], 0
 
     def getAllTotalWithdraws(self, request, lang, user):
         total_withdraw = 0
@@ -1183,7 +1183,7 @@ class Withdraws:
                     })
             return wwithdraws
         else:
-            return "None"
+            return []
 
     def getWithdrawById(self, request, lang, withdrawid):
         withdraws = Withdraw.objects.filter(pk=withdrawid)
