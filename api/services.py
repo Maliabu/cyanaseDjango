@@ -7,10 +7,11 @@ from django.contrib.auth.models import User
 import requests
 import uuid
 from collections import defaultdict
+import itertools
 # import os
 
-BEARER_INVESTORS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'
-BEARER_SAVERS = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
+BEARER_INVESTORS = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
+BEARER_SAVERS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'  # fails to verify transactions with this bearer
 
 
 _helper = Helper()
@@ -116,6 +117,66 @@ class InvestmentOptions:
                 units_accumulated = (total_units/selling_price) * int(deposit_amount)
                 # now lets update the units for the performance of this investment option
                 new_units = total_units + units_accumulated
+                # lets get the biggest investment option and update units
+                biggest_option = InvestmentPerformance.objects.filter(pk=biggest_performance)
+                biggest_option.update(
+                    units=new_units
+                )
+            # return {
+            #     "units_accumulated": units_accumulated,
+            #     "investment option": options.name,
+            #     "handled_by": options.fund_manager.name
+            # }
+            return units_accumulated
+        else:
+            return {
+                "message": "This investment option is not available",
+                "success": False
+            }
+
+    def getWithdrawInvestmentOptionById(self, request, lang, userid, id, withdraw_amount):
+        user = User.objects.filter(pk=userid).exists()
+        option = InvestmentOption.objects.filter(pk=id)
+        units_accumulated = 0
+        option_id = ''
+        investment_options = []
+        biggest_investment_option = []
+        performance_ids = []
+        biggest_performance = 0
+        if user is True:
+            # if the user exists, get their selected option
+            for options in option:
+                investment_options.append({
+                    "option_id": options.pk,
+                    "investment_option": options.name,
+                    "class_type": options.class_type.pk,
+                    "fund_manager": options.fund_manager.pk,
+                    "minimum_deposit": options.minimum,
+                    "interest": options.interest,
+                    "status": options.status,
+                    "units": options.units,
+                    "fund": options.fund,
+                    "created": options.created
+                })
+            option_id = options.pk
+            # lets get the performance for the investment option to get
+            # units accumulated by the user
+            investment_option_performance = InvestmentPerformance.objects.filter(investment_option_id=option_id)
+            # multiple ids may be available
+            # we need the highest pk value associated with the ids.
+            for performance in investment_option_performance:
+                # get the result with the biggest performance id
+                performance_ids.append(performance.pk)
+                order_performance_ids = sorted(performance_ids)
+                biggest_performance = order_performance_ids[-1]
+                # now we have the highest id, lets get the object there
+            if performance.pk == biggest_performance:
+                biggest_investment_option.append(performance.pk)
+                total_units = performance.units
+                selling_price = performance.selling
+                units_accumulated = (total_units/selling_price) * int(withdraw_amount)
+                # now lets update the units for the performance of this investment option
+                new_units = total_units - units_accumulated
                 # lets get the biggest investment option and update units
                 biggest_option = InvestmentPerformance.objects.filter(pk=biggest_performance)
                 biggest_option.update(
@@ -296,7 +357,7 @@ class Deposits:
                         "currency": deposit.currency,
                         "deposit_category": deposit.deposit_category,
                         "payment_means": deposit.payment_means,
-                        "investment_option": deposit.investment_option,
+                        "investment_option": deposit.investment_option.name,
                         "account_type": deposit.account_type.code_name
                     })
             return totalDeposit, networth, getDeposits
@@ -337,7 +398,31 @@ class Deposits:
                         "success": False
                     }
 
-    def getAllDeposits(self, request, lang, user):
+    def getDepositsByInvestmentOption(self, request, lang, userid):
+        investment_options_ids = []
+        investment_data = []
+        option_withdraws = Withdraw.objects.filter(user_id=userid)
+        # get all user deposits
+        deposits = Deposit.objects.filter(user_id=userid)
+        if deposits.exists():
+            for deposit in deposits:
+                investment_options_ids.append(deposit.investment_option.pk)
+        for item in investment_options_ids:
+            option_withdraws.filter(investment_option_id=item)
+        for withdraw in option_withdraws:
+            if withdraw is not None:
+                investment_data.append({
+                    "name": withdraw.investment_option.name,
+                    "withdraw_amount": withdraw.withdraw_amount
+                })
+            else:
+                investment_data.append({
+                    "name": withdraw.investment_option.name,
+                    "withdraw_amount": 0
+                })
+        return investment_data
+
+    def getAllDeposits(self, request, lang):
         deposits = []
         options = []
         dates = []
@@ -348,7 +433,6 @@ class Deposits:
         totalNetworth = 0
         totalDepositUGX = 0
         totalDepositUSD = 0
-        sum_networths = 0
         userid = request.user.id
         ddeposits = Deposit.objects.filter(user_id=userid)
         for deposit in ddeposits:
@@ -380,10 +464,10 @@ class Deposits:
             else:
                 pass
         for amount in ddeposits:
-            depo.append({"name": amount.investment_option.name, "datas": amount.deposit_amount/1000, "date": amount.created.strftime("%d %b"), "networths": amount.networth})
+            depo.append({"name": amount.investment_option.name, "datas": amount.deposit_amount/1000, "date": amount.created.strftime("%d %b"), "networths": amount.networth, "id": amount.investment_option.pk})
             dates.append(amount.created.strftime("%d %b"))
-        goalDepositsUGX = Goals.getAllUserGoals(self, request, lang, user)[0]
-        goalDepositUSD = Goals.getAllUserGoals(self, request, lang, user)[1]
+        goalDepositsUGX = Goals.getAllUserGoals(self, request, lang)[0]
+        goalDepositUSD = Goals.getAllUserGoals(self, request, lang)[1]
         totalDepositUGX = totalUGX - goalDepositsUGX
         totalDepositUSD = totalUSD - goalDepositUSD
         # get total networths for diff investments options invested by user
@@ -400,11 +484,10 @@ class Deposits:
         # deposits.sort(reverse=True)
         return totalDepositUGX, totalDepositUSD, totalUGX, totalUSD, depo, dates, deposits, goalDepositsUGX, options, totalNetworth, grouped_dict, grouping
 
-    def depositToGoal(self, request, lang, user, goalid, txRef):
+    def depositToGoal(self, request, lang, goalid, txRef, investment, investment_id, deposit_amount):
         current_datetime = datetime.datetime.now()
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
-        deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
         account_type = request.data["account_type"]
         reference = request.data["reference"]
@@ -425,14 +508,16 @@ class Deposits:
                 deposit_amount=float(deposit_amount),
                 payment_means=payment_means,
                 user=User(pk=int(userid)),
-                goal=Goal(pk=int(goalid)),
                 deposit_category=deposit_category,
-                investment_option=InvestmentOption(pk=0),
+                investment_option=InvestmentOption(pk=int(investment_id)),
                 currency=currency,
                 account_type=account_type,
                 reference=reference,
                 reference_id=reference_id,
-                txRef=txRef
+                txRef=txRef,
+                units=int(investment),
+                available=True,
+                goal=Goal(pk=int(goalid))
             )
             deposit.save()
             # # get deposit id
@@ -449,7 +534,6 @@ class Deposits:
                 "goal_id": goalid,
                 "user_name": user_name,
                 "deposit_id": depositid,
-                "deposit": deposit,
                 "time of deposit": current_datetime
             }
         else:
@@ -458,11 +542,11 @@ class Deposits:
                 "success": False
             }
 
-    def createDeposit(self, request, lang, txRef, investment, investment_id):
+    def createDeposit(self, request, lang, txRef, investment, investment_id, deposit_amount):
         current_datetime = datetime.datetime.now()
         payment_means = request.data["payment_means"]
         deposit_category = request.data["deposit_category"]
-        deposit_amount = request.data["deposit_amount"]
+        # deposit_amount = request.data["deposit_amount"]
         currency = request.data["currency"]
         account_type = request.data["account_type"]
         reference = request.data["reference"]
@@ -479,7 +563,7 @@ class Deposits:
         # check if a user is verified to deposit
         if is_verified is True:
             deposit = Deposit.objects.create(
-                deposit_amount=float(request.data["deposit_amount"]),
+                deposit_amount=float(deposit_amount),
                 payment_means=payment_means,
                 user=User(pk=int(userid)),
                 deposit_category=deposit_category,
@@ -640,14 +724,14 @@ class Goals:
                 "deposit_type": goal.deposit_type,
                 "deposit_reminder_day": goal.deposit_reminder_day,
                 "status": goal.is_active,
-                "created": goal.created
+                "created": goal.created.strftime("%d %b")
             }
         else:
             return {
                 "no id found"
             }
 
-    def getAllUserGoals(self, request, lang, user):
+    def getAllUserGoals(self, request, lang):
         goals = []
         totalUGX = 0
         totalUSD = 0
@@ -666,7 +750,7 @@ class Goals:
                     "goal_period": goal.goal_period,
                     "deposit_type": goal.deposit_type,
                     "deposit_reminder_day": goal.deposit_reminder_day,
-                    "created": goal.created,
+                    "created": goal.created.strftime("%d %b"),
                     "deposit": deposit,
                     "withdraw": withdraw
                 }
@@ -918,13 +1002,18 @@ class RiskProfiles:
             return {
                 "no risk profile exists for this user"
             }
-            
-    def getInvestmentByRiskProfile(self, request, lang, user):
+
+    def getInvestmentByRiskProfile(self, request, lang):
         userid = request.user.id
         cash = 0
         credit = 0
         venture = 0
         absolute_return = 0
+        names = ["Cash", "Credit", "Venture", "Absolute Return"]
+        ids = [11, 5, 12, 13]
+        percentages = []
+        result = []
+        # get percentages
         risk_profile = RiskProfile.objects.filter(user_id=userid)
         if risk_profile.exists():
             for item in risk_profile:
@@ -932,19 +1021,28 @@ class RiskProfiles:
                 credit = item.risk_analysis.credit
                 venture = item.risk_analysis.venture
                 absolute_return = item.risk_analysis.absolute_return
-            return cash, credit, venture, absolute_return
-        else:
-            return {
-                "message": "No risk profile exists for this user",
-                "success": False
-            }
+                percentages.append(cash)
+                percentages.append(credit)
+                percentages.append(venture)
+                percentages.append(absolute_return)
+        for (name, id, percentage) in itertools.zip_longest(names, ids, percentages):
+            result.append({
+                "name": name,
+                "id": id,
+                "percentage": percentage
+            })
+        return result
 
 
 class Withdraws:
     def __init__(self):
         self.help = Helper()
 
-    def withdraw(self, request, lang, user, transactionid):
+    def getAllCountryBanks(self, countryCode):
+        r = requests.get("https://api.flutterwave.com/v3/banks/"+str(countryCode), auth=BearerAuth(BEARER_INVESTORS)).json()
+        return r
+
+    def withdraw(self, request, lang, user, transactionid, investment_option_id, units):
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         userid = request.user.id
@@ -953,6 +1051,7 @@ class Withdraws:
         created = datetime.datetime.now()
         account_type = AccountType.objects.filter(code_name=account_type).get()
         status = "pending"
+        # claculate units to withdraw
         withdraw = Withdraw.objects.create(
                     withdraw_channel=withdraw_channel,
                     withdraw_amount=float(withdraw_amount),
@@ -960,7 +1059,9 @@ class Withdraws:
                     account_type=account_type,
                     user=User(pk=int(userid)),
                     transaction=BankTransaction(pk=int(transactionid)),
-                    status=status
+                    status=status,
+                    investment_option=InvestmentOption(pk=int(investment_option_id)),
+                    units=int(units)
                 )
         withdrawid = withdraw.id
         withdraw.save()
@@ -992,7 +1093,9 @@ class Withdraws:
                     account_type=account_type,
                     user=User(pk=int(userid)),
                     created=created,
-                    status=status
+                    status=status,
+                    units=0,
+                    investment_option=InvestmentOption(pk=11)
                 )
         withdrawid = withdraw.id
         withdraw.save()
@@ -1002,12 +1105,36 @@ class Withdraws:
             "success": True
         }
 
+    def getWithdrawUnitsByInvestmentOption(self, request, lang, userid):
+        withdraw_obj = []
+        units = []
+        # get all user withdraws
+        withdraws = Withdraw.objects.filter(user_id=userid)
+        if withdraws.exists():
+            for withdraw in withdraws:
+                withdraw_obj.append({"name": withdraw.investment_option.name, "datas": withdraw.withdraw_amount, "date": withdraw.created.strftime("%d %b"), "units": withdraw.units})
+            return withdraw_obj
+        else:
+            return units
+
+    def getWithdrawsByInvestmentOption(self, request, lang, userid):
+        withdraw_obj = []
+        all_withdraws = []
+        # get all user withdraws
+        withdraws = Withdraw.objects.filter(user_id=userid)
+        if withdraws.exists():
+            for withdraw in withdraws:
+                withdraw_obj.append({"name": withdraw.investment_option.name, "datas": withdraw.withdraw_amount, "date": withdraw.created.strftime("%d %b")})
+            return withdraw_obj
+        else:
+            return all_withdraws
+
     def getAllWithdraws(self, request, lang, user):
         wwithdraws = []
         total_withdraw = 0
         userid = request.user.id
         withdraws = Withdraw.objects.filter(user_id=userid)
-        if withdraws.exists:
+        if withdraws.exists():
             for withdraw in withdraws:
                 withdrawid = withdraw.pk
                 total_withdraw += withdraw.withdraw_amount
@@ -1018,6 +1145,7 @@ class Withdraws:
                     "currency": withdraw.currency,
                     "account_type": withdraw.account_type.code_name,
                     "status": withdraw.status,
+                    "investment_option": withdraw.investment_option.name,
                     "created": withdraw.created
                 })
             return wwithdraws, total_withdraw
@@ -1028,7 +1156,7 @@ class Withdraws:
         total_withdraw = 0
         userid = request.user.id
         withdraws = Withdraw.objects.filter(user_id=userid)
-        if withdraws.exists:
+        if withdraws.exists():
             for withdraw in withdraws:
                 total_withdraw += withdraw.withdraw_amount
             return total_withdraw
@@ -1039,7 +1167,7 @@ class Withdraws:
         wwithdraws = []
         userid = request.user.id
         withdraws = Withdraw.objects.filter(user_id=userid)
-        if withdraws.exists:
+        if withdraws.exists():
             for withdraw in withdraws:
                 withdrawid = withdraw.pk
                 if withdraw.status == "pending":
@@ -1050,6 +1178,7 @@ class Withdraws:
                         "currency": withdraw.currency,
                         "account_type": withdraw.account_type.code_name,
                         "status": withdraw.status,
+                        "investment_option": withdraw.investment_option.name,
                         "created": withdraw.created.strftime("%d %b")
                     })
             return wwithdraws

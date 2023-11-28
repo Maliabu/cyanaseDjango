@@ -121,10 +121,10 @@ class NextOfKin(models.Model):
 
 class RiskAnalysis(models.Model):
     name = models.CharField(max_length=200, null=True, blank=True)
-    cash = models.IntegerField(default=0)
-    credit = models.IntegerField(default=0)
-    venture = models.IntegerField(default=0)
-    absolute_return = models.IntegerField(default=0)
+    cash = models.FloatField(default=0)
+    credit = models.FloatField(default=0)
+    venture = models.FloatField(default=0)
+    absolute_return = models.FloatField(default=0)
     score_min = models.IntegerField(default=0)
     score_max = models.IntegerField(default=0)
     created = models.DateTimeField(auto_now_add=True)
@@ -166,7 +166,7 @@ class RiskProfile(models.Model):
     investment_option = models.CharField(
         max_length=200,
         verbose_name="investment option",
-        default="Cash | Venture | Credit",
+        default="Automatic Asset Allocation",
     )
     is_complete = models.BooleanField(default=False, verbose_name="status")
 
@@ -483,7 +483,7 @@ class InvestmentOption(models.Model):
     minimum = models.BigIntegerField(default=0)
     interest = models.IntegerField(default=0)
     status = models.BooleanField(default=0)
-    units = models.BigIntegerField(default=0)
+    units = models.FloatField(default=0)
     fund = models.CharField(max_length=200, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     
@@ -497,7 +497,7 @@ class InvestmentPerformance(models.Model):
     bought = models.BigIntegerField(default=0)
     selling = models.BigIntegerField(default=0)
     performance_value = models.IntegerField(default=0)
-    units = models.BigIntegerField(default=0)
+    units = models.FloatField(default=0)
     status = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
 
@@ -530,7 +530,7 @@ class Deposit(models.Model):
     networth = models.BigIntegerField(default=0)
     available = models.BooleanField(default=0)
     updated = models.DateTimeField(null=True, blank=True)
-    units = models.BigIntegerField(default=0)
+    units = models.FloatField(default=0)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.deposit_amount)
@@ -544,8 +544,10 @@ class Withdraw(models.Model):
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
     created = models.DateTimeField(auto_now_add=True)
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
+    investment_option = models.ForeignKey(InvestmentOption, on_delete=models.CASCADE, null=True, blank=True)
     transaction = models.ForeignKey(BankTransaction, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=200, default="")
+    units = models.FloatField(default=0)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.withdraw_amount)

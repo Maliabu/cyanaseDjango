@@ -201,51 +201,47 @@ class MakeDeposit(APIView):
                 'success': False
             })
         else:
-            if int(investment_id) != 0:
-                investment = _investmentOption.getInvestmentOptionById(request, lang, userid, investment_id, deposit_amount)
-                # providers = _deposit.getLinkingProviders
-                # print(providers)
-                transaction_id = str(reference_id)
-                verified = _deposit.verifyTransaction(transaction_id)
-                if verified == "success":
-                    txRef = _refs.getTxRef()
-                    tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
-                    if tx_ref["success"] is False:
-                        deposit = _deposit.createDeposit(request, lang, txRef, investment, investment_id)
+            # providers = _deposit.getLinkingProviders
+            # print(providers)
+            transaction_id = str(reference_id)
+            verified = _deposit.verifyTransaction(transaction_id)
+            # error or success - status returned (flutterwave)
+            if verified == "success":
+                txRef = _refs.getTxRef()
+                tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
+                if tx_ref["success"] is False:
+                    if int(investment_id) != 0:
+                        # get units
+                        units = _investmentOption.getInvestmentOptionById(request, lang, userid, investment_id, deposit_amount)
+                        deposit = _deposit.createDeposit(request, lang, txRef, units, investment_id, deposit_amount)
                         return Response(deposit)
-                    if tx_ref["success"] is True:
+                    else:
+                        # get percentages from analysis
+                        analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                        for any_analysis in analysis:
+                            # create a deposit rotating each in list
+                            # get new deposit amount
+                            new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
+                            new_investment_id = any_analysis["id"]
+                            units = _investmentOption.getInvestmentOptionById(request, lang, userid, new_investment_id, new_deposit_amount)
+                            deposit = _deposit.createDeposit(request, lang, txRef, units, new_investment_id, new_deposit_amount)
                         return Response({
-                            'message': "Something went wrong. Deposit unsuccessful",
-                            'success': False
+                            "message": "Deposits made successfully",
+                            "success": True,
+                            "type": "Automatic deposits made successfully"
                         })
                 else:
                     return Response({
-                        'message': "Something went wrong. Deposit unsuccessful",
-                        'success': False
+                        'message': "Something went wrong",
+                        'success': False,
+                        "type": "reference found/missing"
                     })
             else:
-                investments = _riskprofile.getInvestmentByRiskProfile(request, lang, user)
-                # providers = _deposit.getLinkingProviders
-                # print(providers)
-                transaction_id = str(reference_id)
-                verified = _deposit.verifyTransaction(transaction_id)
-                if verified == "success":
-                    txRef = _refs.getTxRef()
-                    tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
-                    if tx_ref["success"] is False:
-                        for investment in investments:
-                            deposit = _deposit.createDeposit(request, lang, txRef, investment, investment_id)
-                        return Response(deposit)
-                    if tx_ref["success"] is True:
-                        return Response({
-                            'message': "Something went wrong. Deposit unsuccessful",
-                            'success': False
-                        })
-                else:
-                    return Response({
-                        'message': "Something went wrong. Deposit unsuccessful",
-                        'success': False
-                    })
+                return Response({
+                    'message': "Unathorised",
+                    'success': False,
+                    "type": "Transaction"
+                })
 
 
 class MakeDepositToBank(APIView):
@@ -398,6 +394,7 @@ class MakeDepositToGoal(APIView):
         txRef = request.data["tx_ref"]
         goalid = request.data["goal_id"]
         user = _user.getAuthUser(request, lang)
+        userid = user["user_id"]
         ##########################
         if not payment_means:
             return Response({
@@ -454,18 +451,32 @@ class MakeDepositToGoal(APIView):
                 txRef = _refs.getTxRef()
                 tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
                 if tx_ref["success"] is False:
-                    deposit = _deposit.depositToGoal(request, lang, user, goalid, txRef)
-                    return Response(deposit)
-                if tx_ref["success"] is True:
+                    # get percentages from analysis
+                    analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                    for any_analysis in analysis:
+                        # create a deposit rotating each in list
+                        # get new deposit amount
+                        new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
+                        new_investment_id = any_analysis["id"]
+                        units = _investmentOption.getInvestmentOptionById(request, lang, userid, new_investment_id, new_deposit_amount)
+                        deposit = _deposit.depositToGoal(request, lang, goalid, txRef, units, new_investment_id, new_deposit_amount)
                     return Response({
-                        'message': "Something went wrong. Deposit unsuccessful",
-                        'success': False
+                        "message": "Deposits made successfully",
+                        "success": True,
+                        "type": "Automatic deposits made successfully"
+                    })
+                else:
+                    return Response({
+                        'message': "Something went wrong",
+                        'success': False,
+                        "type": "reference found/missing"
                     })
             else:
                 return Response({
-                        'message': "Something went wrong. Deposit unsuccessful",
-                        'success': False
-                    })
+                    'message': "Unathorised",
+                    'success': False,
+                    "type": "Transaction"
+                })
 
 
 class GetDepositsByAuthUser(APIView):
@@ -477,7 +488,7 @@ class GetDepositsByAuthUser(APIView):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
         lang = DEFAULT_LANG if lang is None else lang
-        deposit = _deposit.getAllDeposits(request, lang, user)
+        deposit = _deposit.getAllDeposits(request, lang)
         return Response(deposit)
 
 
@@ -649,7 +660,7 @@ class GetGoalsByAuthUser(APIView):
         userid = request.user.id
         user = _user.getAuthUserById(request, lang, userid)
         lang = DEFAULT_LANG if lang is None else lang
-        goal = _goal.getAllUserGoals(request, lang, user)
+        goal = _goal.getAllUserGoals(request, lang)
         return Response(goal)
 
 
@@ -822,6 +833,31 @@ class GetRiskProfile(APIView):
         return Response(riskprofile)
 
 
+class GetRiskAnalysisPercentages(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
+        risk_analysis_percentages = _riskprofile.getInvestmentByRiskProfile(request, lang)
+        return Response(risk_analysis_percentages)
+
+
+class GetCountryBanks(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
+        userid = request.user.id
+        user = _user.getAuthUserById(request, lang, userid)
+        code = user["profile"]["country"]
+        banks = _withdraw.getAllCountryBanks(code)
+        return Response(banks)
+
+
 class MakeWithdrawFromBank(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -838,6 +874,7 @@ class MakeWithdrawFromBank(APIView):
         account_bank = request.data["account_bank"]
         account_number = request.data["account_number"]
         narration = "Withdraw"
+        investment_option_id = request.data["investment_id"]
         beneficiary_name = request.data["beneficiary_name"]
         is_verified = request.user.userprofile.is_verified
         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
@@ -884,8 +921,12 @@ class MakeWithdrawFromBank(APIView):
                 'success': False
             })
         else:
+            # if verified user
             if is_verified is True:
+                # if subscribed
                 if is_subscribed["status"] == "subscribed":
+                    # get units
+                    units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
                     _type = ""
                     if withdraw_channel == "bank":
                         _type = "account"
@@ -906,35 +947,29 @@ class MakeWithdrawFromBank(APIView):
                             "beneficiary_name": beneficiary_name
                         })
                         transactions.append(res)
-                        print(res)
-
-                        balanceres = rave.Transfer.getBalance("UGX")
-                        print(balanceres)
-
                     except RaveExceptions.IncompletePaymentDetailsError as e:
                         print(e)
-
                     except RaveExceptions.InitiateTransferError as e:
                         print(e.err)
-
                     except RaveExceptions.TransferFetchError as e:
                         print(e.err)
-
                     except RaveExceptions.ServerError as e:
                         print(e.err)
+                    print(transactions)
                     if transactions[0]["error"] is False:
                         transaction = _transaction.createTransfer(request, lang, transactions)
                         transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdraw(request, lang, user, transactionid)
+                        withdraw = _withdraw.withdraw(request, lang, user, transactionid, investment_option_id, units)
                         return Response(withdraw)
                 else:
+                    # not subscribed
                     substatus = is_subscribed["status"]
-                    time_left = is_subscribed["days_passed"]
                     return Response({
                         "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
                         "success": False
                     })
             else:
+                # not verified user
                 return Response({
                     "message": "your account is not verified, please check your email and verify",
                     "success": False
@@ -1035,10 +1070,6 @@ class MakeGoalWithdrawFromBank(APIView):
                                 "beneficiary_name": beneficiary_name
                             })
                             transactions.append(res)
-                            print(res)
-
-                            balanceres = rave.Transfer.getBalance("UGX")
-                            print(balanceres)
 
                         except RaveExceptions.IncompletePaymentDetailsError as e:
                             print(e)
@@ -1058,8 +1089,8 @@ class MakeGoalWithdrawFromBank(APIView):
                             return Response(withdraw)
                     elif goal_status["is_active"] == True:
                         return Response({
-                            "message":"This goal is done.",
-                            "success":False
+                            "message": "This goal is done.",
+                            "success": False
                         })
                 else:
                     substatus = is_subscribed["status"]
@@ -1124,8 +1155,9 @@ class MakeWithdrawFromMobileMoney(APIView):
         currency = request.data["currency"]
         account_type = request.data["account_type"]
         account_bank = request.data["account_bank"]
-        account_number = request.data["account_number"]
+        phone_number = request.data["phone_number"]
         beneficiary_name = request.data["beneficiary_name"]
+        investment_option_id = request.data["investment_id"]
         is_verified = request.user.userprofile.is_verified
         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
@@ -1158,7 +1190,7 @@ class MakeWithdrawFromMobileMoney(APIView):
                 "type": "account bank",
                 'success': False
             })
-        elif not account_number:
+        elif not phone_number:
             return Response({
                 'message': "This field is required",
                 "type": "account number",
@@ -1171,8 +1203,12 @@ class MakeWithdrawFromMobileMoney(APIView):
                 'success': False
             })
         else:
+            # if verified user
             if is_verified is True:
-                if is_subscribed["status"] != "subscribed":
+                # if subscribed
+                if is_subscribed["status"] == "subscribed":
+                    # get units
+                    units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
                     _type = ""
                     if withdraw_channel == "bank":
                         _type = "account"
@@ -1185,7 +1221,7 @@ class MakeWithdrawFromMobileMoney(APIView):
 
                     details = {
                             "account_bank": account_bank,
-                            "account_number": account_number,
+                            "account_number": phone_number,
                             "amount": total_withdraw,
                             "currency": currency,
                             "beneficiary_name": beneficiary_name,
@@ -1200,18 +1236,39 @@ class MakeWithdrawFromMobileMoney(APIView):
                     if transactions[0]["error"] is False:
                         transaction = _transaction.createTransfer(request, lang, transactions)
                         transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdraw(request, lang, user, transactionid)
+                        withdraw = _withdraw.withdraw(request, lang, user, transactionid, investment_option_id, units)
                         return Response(withdraw)
                 else:
                     return Response({
                         "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
-                        "success": False
+                        "success": False,
+                        "type": "subscription"
                     })
             else:
                 return Response({
                     "message": "your account is not verified, please check your email and verify",
-                    "success": False
+                    "success": False,
+                    "type": "verification"
                 })
+
+
+class IsUserVerified(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang):
+        is_verified = request.user.userprofile.is_verified
+        if is_verified:
+            return Response({
+                "message": "User is verified",
+                "success": True
+            })
+        else:
+            return Response({
+                "message": "User is not verified",
+                "success": False
+            })
 
 
 class MakeGoalWithdrawFromMobileMoney(APIView):
@@ -1335,6 +1392,18 @@ class GetWithdrawsByAuthUser(APIView):
         user = _user.getAuthUserById(request, lang, userid)
         lang = DEFAULT_LANG if lang is None else lang
         withdraw = _withdraw.getAllWithdraws(request, lang, user)
+        return Response(withdraw)
+
+
+class GetInvestmentWithdraws(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang):
+        userid = request.user.id
+        lang = DEFAULT_LANG if lang is None else lang
+        withdraw = _withdraw.getWithdrawsByInvestmentOption(request, lang, userid)
         return Response(withdraw)
 
 
@@ -1568,7 +1637,6 @@ class OnboardAuthUsersDeposits(ObtainAuthToken):
                 else:
                     email = deposit["email"]
                     user = _user.getAuthUserByEmail(request, lang, email)
-                    print(user)
                     _deposit.createDeposits(request, lang, deposit, user)
             number = len(deposits)
             return Response({
@@ -1602,7 +1670,6 @@ class OnboardAuthUsersWithdraws(ObtainAuthToken):
                 else:
                     email = withdraw["email"]
                     user = _user.getAuthUserByEmail(request, lang, email)
-                    print(user)
                     _withdraw.withdraws(request, lang, withdraw, user)
             number = len(withdraws)
             return Response({
@@ -1610,3 +1677,15 @@ class OnboardAuthUsersWithdraws(ObtainAuthToken):
                 "message": "These users have their withdraws in order",
                 "success": True
             })
+
+
+class GetUserActualNetworthData(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        userid = request.user.id
+        user_deposit = _deposit.getDepositsByInvestmentOption(request, lang, userid)
+        return Response(user_deposit)
