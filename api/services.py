@@ -328,7 +328,7 @@ class Deposits:
                 "deposit_category": ddeposit.deposit_category,
                 "deposit_amount": ddeposit.deposit_amount,
                 "currency": ddeposit.currency,
-                "investment_option": ddeposit.investment_option.name,
+                # "investment_option": ddeposit.investment_option.name,
                 "account_type": ddeposit.account_type.pk,
                 "created": ddeposit.created,
             }
@@ -602,6 +602,7 @@ class Deposits:
         deposit_amount = deposit["deposit_amount"]
         currency = deposit["currency"]
         created = deposit["date"]
+        networth = deposit["networth"]
         account_type = "basic"
         reference = "TEST"
         reference_id = 0
@@ -616,8 +617,9 @@ class Deposits:
                 currency=currency,
                 account_type=account_type,
                 reference=reference,
+                networth=networth,
                 reference_id=reference_id,
-                investment_option=InvestmentOption(pk=0),
+                investment_option=InvestmentOption(pk=11),
                 txRef=txRef,
                 created=created,
                 units=0,
@@ -1092,10 +1094,10 @@ class Withdraws:
                     currency=currency,
                     account_type=account_type,
                     user=User(pk=int(userid)),
+                    investment_option=InvestmentOption(pk=11),
                     created=created,
                     status=status,
-                    units=0,
-                    investment_option=InvestmentOption(pk=11)
+                    units=0
                 )
         withdrawid = withdraw.id
         withdraw.save()

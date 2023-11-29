@@ -527,7 +527,7 @@ class Deposit(models.Model):
     reference = models.CharField(max_length=200, default="")
     reference_id = models.IntegerField(default=0)
     txRef = models.CharField(max_length=200)
-    networth = models.BigIntegerField(default=0)
+    networth = models.FloatField(default=0)
     available = models.BooleanField(default=0)
     updated = models.DateTimeField(null=True, blank=True)
     units = models.FloatField(default=0)

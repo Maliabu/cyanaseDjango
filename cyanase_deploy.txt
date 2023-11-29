@@ -303,3 +303,17 @@ website: http://34.136.11.124/
 http://34.136.11.124/admin/
 username: admin
 password: K62&5ben
+
+
+// database order of upload
+1. create database
+2. import sql tables no data
+3. users data
+4. account type data
+5. investment classes data
+6. investment options data - id (0) is necessary as Automatic Asset Allocation
+7. investment performance data 
+8. deposit data
+9. withdraw data
+10. goals data
+11. subscriptions data 
