@@ -83,6 +83,12 @@ class UserProfile(models.Model):
     logo = models.ImageField(
         upload_to="api_profile", default="default_logo.jpg"
     )
+    bankname = models.CharField(max_length=255, null=True, blank=True)
+    banknumber = models.CharField(max_length=255, null=True, blank=True)
+    bankbranch = models.CharField(max_length=255, null=True, blank=True)
+    bankaccname = models.CharField(max_length=255, null=True, blank=True)
+    bio = models.CharField(max_length=255, null=True, blank=True)
+    company_profile = models.CharField(max_length=255, null=True, blank=True)
     is_verified = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=True)
     is_disabled = models.BooleanField(default=False)
@@ -444,29 +450,29 @@ class Goal(models.Model):
         return "%s - %s - %s" % (self.user, self.goal, self.goal_amount)
 
     
-class FundManager(models.Model):
-    type = models.CharField(max_length=200, default="fundmanager", null=True)
-    country = models.CharField(max_length=200, blank=True, null=True)
-    name = models.CharField(max_length=255, null=True, blank=True)
-    bio = models.CharField(max_length=255, null=True, blank=True)
-    company_profile = models.CharField(max_length=255, null=True, blank=True)
-    phoneno = models.CharField(max_length=255, null=True, blank=True)
-    email = models.EmailField(max_length=30, null=True, blank=True)
-    password = models.CharField(max_length=255, null=True, blank=True)
-    is_verified = models.BooleanField(default=0)
-    bankname = models.CharField(max_length=255, null=True, blank=True)
-    banknumber = models.CharField(max_length=255, null=True, blank=True)
-    bankbranch = models.CharField(max_length=255, null=True, blank=True)
-    bankaccname = models.CharField(max_length=255, null=True, blank=True)
-    profile_picture = models.ImageField(
-        upload_to="profile", default="default_picture.jpg"
-    )
-    created = models.DateTimeField(auto_now_add=True)
-    
-    def __str__(self):
-        return "%s" % self.name
+# class FundManager(models.Model):
+#     type = models.CharField(max_length=200, default="fundmanager", null=True)
+#     country = models.CharField(max_length=200, blank=True, null=True)
+#     name = models.CharField(max_length=255, null=True, blank=True)
+#     bio = models.CharField(max_length=255, null=True, blank=True)
+#     company_profile = models.CharField(max_length=255, null=True, blank=True)
+#     phoneno = models.CharField(max_length=255, null=True, blank=True)
+#     email = models.EmailField(max_length=30, null=True, blank=True)
+#     password = models.CharField(max_length=255, null=True, blank=True)
+#     is_verified = models.BooleanField(default=0)
+#     bankname = models.CharField(max_length=255, null=True, blank=True)
+#     banknumber = models.CharField(max_length=255, null=True, blank=True)
+#     bankbranch = models.CharField(max_length=255, null=True, blank=True)
+#     bankaccname = models.CharField(max_length=255, null=True, blank=True)
+#     profile_picture = models.ImageField(
+#         upload_to="profile", default="default_picture.jpg"
+#     )
+#     created = models.DateTimeField(auto_now_add=True)
 
-    
+#     def __str__(self):
+#         return "%s" % self.name
+
+
 class InvestmentClass(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True)
     code = models.CharField(max_length=255, null=True, blank=True)
@@ -479,7 +485,7 @@ class InvestmentClass(models.Model):
 class InvestmentOption(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True)
     class_type = models.ForeignKey(InvestmentClass, on_delete=models.CASCADE, null=True, blank=True)
-    fund_manager = models.ForeignKey(FundManager, on_delete=models.CASCADE)
+    fund_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     minimum = models.BigIntegerField(default=0)
     interest = models.IntegerField(default=0)
     status = models.BooleanField(default=0)
@@ -493,7 +499,7 @@ class InvestmentOption(models.Model):
 
 class InvestmentPerformance(models.Model):
     investment_option = models.ForeignKey(InvestmentOption, on_delete=models.CASCADE, null=True, blank=True)
-    fund_manager = models.ForeignKey(FundManager, on_delete=models.CASCADE, null=True, blank=True)
+    fund_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     bought = models.BigIntegerField(default=0)
     selling = models.BigIntegerField(default=0)
     performance_value = models.IntegerField(default=0)
@@ -506,12 +512,21 @@ class InvestmentPerformance(models.Model):
 
 
 class FundWithdraw(models.Model):
-    fund_manager_id = models.ForeignKey(FundManager, on_delete=models.CASCADE)
+    fund_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     withdarw_amount = models.BigIntegerField(default=0)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return "%s %d" % self.fund_manager_id % self.withdarw_amount
+        return "%s %d" % self.fund_manager % self.withdarw_amount
+
+
+class Fund(models.Model):
+    fund_manager = models.ForeignKey(User, on_delete=models.CASCADE)
+    deposit_amount = models.BigIntegerField(default=0)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return "%s %d" % self.fund_manager % self.withdarw_amount
 
 
 class Deposit(models.Model):
@@ -519,7 +534,7 @@ class Deposit(models.Model):
     investment_option = models.ForeignKey(InvestmentOption, on_delete=models.CASCADE, null=True, blank=True)
     payment_means = models.CharField(max_length=200, null=True)
     deposit_category = models.CharField(max_length=200, null=True)
-    deposit_amount = models.BigIntegerField(default=0)
+    deposit_amount = models.FloatField(default=0)
     currency = models.CharField(max_length=200, default="UGX")
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
@@ -539,7 +554,7 @@ class Deposit(models.Model):
 class Withdraw(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     withdraw_channel = models.CharField(max_length=200, default="bank")
-    withdraw_amount = models.BigIntegerField(default=0)
+    withdraw_amount = models.FloatField(default=0)
     currency = models.CharField(max_length=200, default="UGX")
     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
     created = models.DateTimeField(auto_now_add=True)
@@ -574,14 +589,25 @@ class Subscription(models.Model):
     currency = models.CharField(max_length=200, default="UGX")
     created = models.DateTimeField(auto_now_add=True)
     txRef = models.CharField(max_length=200)
+    was_displayed = models.BooleanField(default=0)
 
     def __str__(self):
         return "%s" % self.is_subscribed
 
 
+class HealthCheck(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_subscribed_overall = models.BooleanField(default=False)
+    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, null=True, blank=True)
+    was_displayed = models.BooleanField(default=False)
+
+    def __str__(self):
+        return "%s" % self.is_subscribed_overall
+
+
 class Networth(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    amount = models.BigIntegerField(default=0)
+    amount = models.FloatField(default=0)
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
 

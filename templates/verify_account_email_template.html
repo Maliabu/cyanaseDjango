@@ -1,11 +1,14 @@
 <div>
     {% autoescape off %}
+    {% comment %} <div class="text-center">
+    <img src="http://127.0.0.1:8000/static/CI.png" alt="My image" class="p-3" height="100" width="100"></div> {% endcomment %}
+        <div class="p-5 rounded-4 bg-light text-center">
         Hello {{ user.first_name }}, this is your verification email from CYANASE INVESTORS LTD. 
     {% comment %} <h1> {{verificationcode}} </h1> {% endcomment %}
-     {% comment %} <a href="http://127.0.0.1:8000/accounts/verify/?ref={{ encrypted_userid }}&verif={{ encrypted_verification_code }}">
+    {% comment %} <a href="http://127.0.0.1:8000/accounts/verify/?ref={{ encrypted_userid }}&verif={{ encrypted_verification_code }}">
     Please click this link to activate your account</a>  {% endcomment %}
-    <a href="https://auth.cyanase.lol/accounts/verify/?ref={{ encrypted_userid }}&verif={{ encrypted_verification_code }}">
-        Please click this link to activate your account</a> 
+     <a href="https://server.cyanase.lol/accounts/verify/?ref={{ encrypted_userid }}&verif={{ encrypted_verification_code }}">
+        Please click this link to activate your account</a></div>
      {% endautoescape %} 
 </div> 
 {% comment %} <h1> {{ verificationcode }} </h1> {% endcomment %}

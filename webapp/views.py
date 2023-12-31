@@ -82,7 +82,7 @@ def VerifyAccount(request):
             )
         else:
             _user.VerifyAccount(request, lang, userid, code)
-            update = _user.updateUserVerificationToken(request, lang, userid)
+            _user.updateUserVerificationToken(request, lang, userid)
             return render(
                 request,
                 "verify-account.html",

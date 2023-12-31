@@ -322,6 +322,56 @@ class Users:
         else:
             return False
 
+    def emailIsVerified(self, request, lang, email):
+        user = self.emailExists(request, lang, email)
+        if user:
+            get_user = self.getAuthUserByEmail(request, lang, email)
+            user_id = get_user["user_id"]
+            profile = UserProfile.objects.filter(user_id=user_id)
+            for profiles in profile:
+                is_verified = profiles.is_verified
+                if is_verified is True:
+                    return True
+                else:
+                    return False
+        else:
+            return False
+
+    def resendVerificationEmail(self, request, lang, email):
+        user = self.emailExists(request, lang, email)
+        if user:
+            get_user = self.getAuthUserByEmail(request, lang, email)
+            userid = get_user["user_id"]
+            user = self.getAuthUserById(request, lang, userid)
+            current_site = get_current_site(request)
+            profile = UserProfile.objects.filter(user_id=userid)
+            for profiles in profile:
+                verificationcode = profiles.verification_code
+            ###############
+            encrypted_verification_code = self.cryptor.encrypt(verificationcode)
+            encrypted_userid = self.cryptor.encrypt(userid)
+            content = self.mailer.getEMailTemplateContent(
+                "verify_account_email_template.html",
+                {
+                    "user": user,
+                    "encrypted_verification_code": encrypted_verification_code,
+                    "encrypted_userid": encrypted_userid,
+                    "verificationcode": verificationcode,
+                    "domain": current_site,
+                },
+            )
+            #######################################
+            self.mailer.sendHTMLEmail(email, "Please verify your account", content)
+            return {
+                "message": "Verification Email sent",
+                "success": True
+            }
+        else:
+            return {
+                "message": "User doesnot exist",
+                "success": False
+            }
+
     def phoneExists(self, request, lang, phoneno):
         user_prof = UserProfile.objects.filter(phoneno=phoneno)
         if user_prof:
@@ -450,6 +500,7 @@ class Users:
         uuser.userprofile.last_modified = current_datetime
         uuser.userprofile.moa = moa
         uuser.userprofile.coi = coi
+        uuser.userprofile.website = last_name
         uuser.save()
         # get Token
         #############

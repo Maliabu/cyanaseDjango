@@ -1,6 +1,6 @@
 
 import datetime
-from .models import Deposit, AccountType, Goal, Subscription, Withdraw, RiskProfile, Networth, NextOfKin, InvestmentOption, InvestmentPerformance, RiskAnalysis, BankTransaction
+from .models import Deposit, AccountType, Goal, Subscription, Withdraw, RiskProfile, Networth, NextOfKin, InvestmentOption, InvestmentPerformance, RiskAnalysis, BankTransaction, UserProfile
 from .helper.helper import Helper
 # from .v1.locale import Locale
 from django.contrib.auth.models import User
@@ -9,9 +9,11 @@ import uuid
 from collections import defaultdict
 import itertools
 # import os
+from cyanase_api import settings
 
-BEARER_INVESTORS = 'FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X'
-BEARER_SAVERS = 'FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X'  # fails to verify transactions with this bearer
+
+BEARER_INVESTORS = settings.DEPOSIT_SEC_KEY
+BEARER_SAVERS = settings.SUB_SEC_KEY
 
 
 _helper = Helper()
@@ -55,11 +57,15 @@ class InvestmentOptions:
         investment_options = []
         if user is True:
             for options in option:
+                # get profile of fund manager then country
+                fund_manager_id = options.fund_manager.pk
+                fund_manager_country = self.getFundManagerCountry(fund_manager_id)
                 investment_options.append({
                     "investment_option_id": options.pk,
                     "investment_option": options.name,
                     "class_type": options.class_type.pk,
                     "fund_manager": options.fund_manager.pk,
+                    "fund_manager_country": fund_manager_country,
                     "minimum_deposit": options.minimum,
                     "interest": options.interest,
                     "status": options.status,
@@ -73,6 +79,15 @@ class InvestmentOptions:
                 "message": "This investment option is not available",
                 "success": False
             }
+    
+    def getFundManagerCountry(self, fund_manager_id):
+        fund_manager_profile = UserProfile.objects.filter(user_id=fund_manager_id)
+        if fund_manager_profile.exists():
+            for profile in fund_manager_profile:
+                country = profile.country
+                return country
+        else:
+            return "No fund manager with this account"
 
     def getInvestmentOptionById(self, request, lang, userid, id, deposit_amount):
         user = User.objects.filter(pk=userid).exists()
@@ -114,19 +129,15 @@ class InvestmentOptions:
                 biggest_investment_option.append(performance.pk)
                 total_units = performance.units
                 selling_price = performance.selling
-                units_accumulated = (total_units/selling_price) * int(deposit_amount)
+                units_accumulated = int(total_units)/int(selling_price) * int(deposit_amount)
                 # now lets update the units for the performance of this investment option
                 new_units = total_units + units_accumulated
+                new_units = round(new_units, 2)
                 # lets get the biggest investment option and update units
                 biggest_option = InvestmentPerformance.objects.filter(pk=biggest_performance)
                 biggest_option.update(
                     units=new_units
                 )
-            # return {
-            #     "units_accumulated": units_accumulated,
-            #     "investment option": options.name,
-            #     "handled_by": options.fund_manager.name
-            # }
             return units_accumulated
         else:
             return {
@@ -174,9 +185,10 @@ class InvestmentOptions:
                 biggest_investment_option.append(performance.pk)
                 total_units = performance.units
                 selling_price = performance.selling
-                units_accumulated = (total_units/selling_price) * int(withdraw_amount)
+                units_accumulated = int(total_units)/int(selling_price) * int(withdraw_amount)
                 # now lets update the units for the performance of this investment option
                 new_units = total_units - units_accumulated
+                new_units = round(new_units, 2)
                 # lets get the biggest investment option and update units
                 biggest_option = InvestmentPerformance.objects.filter(pk=biggest_performance)
                 biggest_option.update(
@@ -203,48 +215,92 @@ class Subscriptions:
         r = requests.get("https://api.flutterwave.com/v3/transactions/"+transaction_id+"/verify", auth=BearerAuth(BEARER_SAVERS)).json()
         return r["status"]
 
+    def highestId(self, request, lang, userid):
+        sub_ids = []
+        subscribed = Subscription.objects.filter(user_id=userid)
+        if subscribed.exists():
+            for subscription in subscribed:
+                # now we need the latest subscription - aka highest id
+                # lets get all ids sorted and get the last id
+                sub_ids.append(subscription.pk)
+                sort = sorted(sub_ids)
+                lastest_subscription = sort[-1]
+            return lastest_subscription
+        else:
+            return 0
+        
+
     def getSubscriptionStatus(self, request, lang, userid):
         # account creation date
         account_date = User.objects.filter(pk=userid).get()
         start_date = account_date.date_joined
-        startt_date = datetime.datetime.strptime(start_date.strftime("%Y/%m/%d"), "%Y/%m/%d")
+        startt_date = datetime.datetime.strptime(start_date.strftime("%m/%d"), "%m/%d")
+        # date now
         now = datetime.datetime.now()
-        noww = datetime.datetime.strptime(now.strftime("%Y/%m/%d"), "%Y/%m/%d")
+        noww = datetime.datetime.strptime(now.strftime("%m/%d"), "%m/%d")
         delta = noww - startt_date
         time = delta.days
-        subscribed = Subscription.objects.filter(user_id=userid)
+        # get latest subscription id
+        lastest_subscription_id = self.highestId(request, lang, userid)
+        subscribed = Subscription.objects.filter(pk=lastest_subscription_id)
         if subscribed.exists():
             for subscription in subscribed:
+                display_freq = subscription.was_displayed
                 if subscription.is_subscribed is True:
-                    return {
-                        "status": "subscribed",
-                        "days_passed": time
-                    }
+                    # if subscribed
+                    # if first time subscription ( time between last subscription and now is less than a year - 366 days)
+                    if subscription.days_left <= 366:
+                        return {
+                            "status": "subscribed",
+                            "days_passed": time,
+                            "displayed": display_freq,
+                            "id": lastest_subscription_id
+                        }
+                    # else its not the first time ( check and renew subscription every time date today is equal to date user joined)
+                    elif subscription.days_left > 366 and noww == startt_date:
+                        return {
+                            "status": "pending",
+                            "days_passed": time,
+                            "displayed": display_freq,
+                            "id": lastest_subscription_id
+                        }
+                    elif subscription.days_left > 366 and noww != startt_date:
+                        return {
+                            "status": "subscribed",
+                            "days_passed": time,
+                            "displayed": display_freq,
+                            "id": lastest_subscription_id
+                        }
                 elif subscription.is_subscribed is False and subscription.days_left < 30:
                     return {
                         "status": "pending",
-                        "days_passed": time
+                        "days_passed": time,
+                        "displayed": display_freq
                     }
                 elif subscription.is_subscribed is False and subscription.days_left > 30:
                     return {
                         "status": "overdue",
-                        "days_passed": time
+                        "days_passed": time,
+                        "displayed": display_freq
                     }
                 else:
                     return {
                         "status": "pending",
-                        "days_passed": time
+                        "days_passed": time,
+                        "displayed": display_freq
                     }
         else:
             if time < 30:
                 return {
                         "status": "pending",
-                        "days_passed": time
+                        "days_passed": time,
+                        "displayed": False
                     }
             else:
                 return {
                         "status": "overdue",
-                        "days_passed": time
+                        "days_passed": time,
+                        "displayed": False
                     }
 
     def subscribe(self, request, lang, userid, txRef):
@@ -260,60 +316,64 @@ class Subscriptions:
         subscription_amount = request.data["amount"]
         if str(subscription_amount) != str(amount):
             return ({
-                "message": "Something went wrong. Subscription unsuccessful - amount",
-                "success": False
+                "message": "Something went wrong. Subscription unsuccessful",
+                "success": False,
+                "type": "Amount payable"
             })
         else:
-            old_subscription = Subscription.objects.filter(user_id=userid)
-            if old_subscription.exists():
-                old_subscription.update(
-                    user=User(pk=int(userid)),
-                    days_left=days_remaining,
-                    reference=reference,
-                    reference_id=referenceid,
-                    amount=float(amount),
-                    currency=currency,
-                    txRef=txRef
-                )
-                for subscription in old_subscription:
-                    return ({
-                        "message": "You have subscribed successfully",
-                        "success": True,
-                        "user_id": userid,
-                        "subscription_id": subscription.id,
-                        "reference_id": subscription.reference_id,
-                        "subscription_amount": subscription.amount,
-                        "currency": subscription.currency,
-                        "reference": subscription.reference,
-                        "days_left": subscription.days_left,
-                        "created": subscription.created
-                    })
-            else:
-                subscribe = Subscription.objects.create(
-                    user=User(pk=int(userid)),
-                    days_left=days_remaining,
-                    reference=reference,
-                    reference_id=referenceid,
-                    amount=float(amount),
-                    currency=currency,
-                    txRef=txRef
-                )
-                # change status to True
-                subscribe.is_subscribed = True
-                subscribe.save()
-                subscriptionid = subscribe.pk
-                return ({
-                    "message": "You have subscribed successfully",
-                    "success": True,
-                    "user_id": userid,
-                    "subscription_id": subscriptionid,
-                    "reference_id": referenceid,
-                    "subscription_amount": amount,
-                    "currency": currency,
-                    "reference": reference,
-                    "days_left": days_left,
-                    "created": created
-                })
+            ########## lets not override any data - we need to know how many times a user has paid subscription
+            # old_subscription = Subscription.objects.filter(user_id=userid)
+            # if old_subscription.exists():
+            #     old_subscription.update(
+            #         user=User(pk=int(userid)),
+            #         days_left=days_remaining,
+            #         reference=reference,
+            #         reference_id=referenceid,
+            #         amount=float(amount),
+            #         currency=currency,
+            #         txRef=txRef
+            #     )
+            #     for subscription in old_subscription:
+            #         return ({
+            #             "message": "You have subscribed successfully",
+            #             "success": True,
+            #             "user_id": userid,
+            #             "subscription_id": subscription.id,
+            #             "reference_id": subscription.reference_id,
+            #             "subscription_amount": subscription.amount,
+            #             "currency": subscription.currency,
+            #             "reference": subscription.reference,
+            #             "days_left": subscription.days_left,
+            #             "created": subscription.created
+            #         })
+            # else:
+            
+            # add new entry for subscription
+            subscribe = Subscription.objects.create(
+                user=User(pk=int(userid)),
+                days_left=days_remaining,
+                reference=reference,
+                reference_id=referenceid,
+                amount=float(amount),
+                currency=currency,
+                txRef=txRef
+            )
+            # change status to True
+            subscribe.is_subscribed = True
+            subscribe.save()
+            subscriptionid = subscribe.pk
+            return ({
+                "message": "You have subscribed successfully",
+                "success": True,
+                "user_id": userid,
+                "subscription_id": subscriptionid,
+                "reference_id": referenceid,
+                "subscription_amount": amount,
+                "currency": currency,
+                "reference": reference,
+                "days_left": days_left,
+                "created": created
+            })
 
 
 class Deposits:
@@ -501,6 +561,7 @@ class Deposits:
         is_verified = request.user.userprofile.is_verified
         # print(userid)
         # # create deposit
+        units = round(investment, 2)
         account_type = AccountType.objects.filter(code_name=account_type).get()
         if is_verified is True:
             # # create deposit
@@ -515,7 +576,7 @@ class Deposits:
                 reference=reference,
                 reference_id=reference_id,
                 txRef=txRef,
-                units=int(investment),
+                units=units,
                 available=True,
                 goal=Goal(pk=int(goalid))
             )
@@ -559,6 +620,7 @@ class Deposits:
         is_verified = request.user.userprofile.is_verified
         # print(userid)
         # # create deposit
+        units = round(investment, 2)
         account_type = AccountType.objects.filter(code_name=account_type).get()
         # check if a user is verified to deposit
         if is_verified is True:
@@ -573,7 +635,7 @@ class Deposits:
                 reference=reference,
                 reference_id=reference_id,
                 txRef=txRef,
-                units=int(investment),
+                units=units,
                 available=True
             )
             deposit.save()
@@ -899,26 +961,24 @@ class RiskProfiles:
         qn11 = request.data["qn11"]
         score = request.data["score"]
         risk_analysis = []
-        investmentOption = request.data["investment_option"]
-        investment_option = ""
+        investment_option = "Automatic Asset Allocation"
         analysis = RiskAnalysis.objects.all()
-        if investmentOption == "":
-            investment_option = "Cash | Venture | Credit | Absolute Return"
-            # get risk analysis from score
-            for item in analysis:
-                min_value = item.score_min
-                max_value = item.score_max + 1
-                score_range = range(min_value, max_value)
-                if int(score) in score_range:
-                    risk_analysis.append(item.pk)
-        else:
-            investment_option = investmentOption
-            for item in analysis:
-                if item.name == "Non Risk Profile":
-                    risk_analysis.append(item.pk)
+        # get risk analysis from score
+        for item in analysis:
+            min_value = item.score_min
+            max_value = item.score_max + 1
+            score_range = range(min_value, max_value)
+            if int(score) in score_range:
+                # add the analytics id to list
+                risk_analysis.append(item.pk)
+            else:
+                # dont add to list
+                # score is too low or too high to evaluate
+                pass
         # check for exisiting risk profile for the user and update
         rriskprofile = RiskProfile.objects.filter(user_id=userid)
         if rriskprofile.exists():
+            print("RISK ANALYSIS", risk_analysis)
             rriskprofile.update(
                 qn1=qn1,
                 qn2=qn2,
@@ -1063,7 +1123,7 @@ class Withdraws:
                     transaction=BankTransaction(pk=int(transactionid)),
                     status=status,
                     investment_option=InvestmentOption(pk=int(investment_option_id)),
-                    units=int(units)
+                    units=units
                 )
         withdrawid = withdraw.id
         withdraw.save()

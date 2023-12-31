@@ -84,7 +84,7 @@ class IsVerified(APIView):
                 'message': "Incomplete data request",
                 'success': False
             })
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         user = _user.isUserAccountVerified(request, lang, userid)
         return Response(user)
 
@@ -105,6 +105,50 @@ class GetAuthUserByEmail(ObtainAuthToken):
             return Response(False)
 
 
+class IsUserVerified(ObtainAuthToken):
+    def post(self, request, lang):
+        email = request.data
+        if not str(email):
+            return Response({
+                'message': "Incomplete data request",
+                'success': False
+            })
+        lang = DEFAULT_LANG if lang is None else lang
+        is_verified = _user.emailIsVerified(request, lang, email)
+        if is_verified is True:
+            return Response({
+                "message": "User is verified",
+                "success": True
+            })
+        else:
+            return Response({
+                "message": "User is not verified",
+                "success": False
+            })
+
+
+class ResendVerificationEmail(ObtainAuthToken):
+    def post(self, request, lang):
+        email = request.data
+        if not str(email):
+            return Response({
+                'message': "Incomplete data request",
+                'success': False
+            })
+        lang = DEFAULT_LANG if lang is None else lang
+        email_sent = _user.resendVerificationEmail(request, lang, email)
+        if email_sent["success"] is True:
+            return Response({
+                "message": "verification email sent",
+                "success": True
+            })
+        else:
+            return Response({
+                "message": "verification email not sent",
+                "success": False
+            })
+
+
 class CreateUserAuthToken(ObtainAuthToken):
     def post(self, request, lang, *args, **kwargs):
         lang = DEFAULT_LANG if lang == None else lang
@@ -123,7 +167,7 @@ class CreateUserAuthToken(ObtainAuthToken):
 # Login User
 class LoginUserAuthToken(ObtainAuthToken):
     def post(self, request, lang):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         data = request.data
         if data:
             username = data["username"]
