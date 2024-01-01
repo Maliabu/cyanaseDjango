@@ -212,6 +212,7 @@ class Subscriptions:
         self.help = Helper()
 
     def verifyTransaction(self, transaction_id):
+        # https://api.ravepay.co/flwv3-pug/getpaidx/api/v2/verify
         r = requests.get("https://api.flutterwave.com/v3/transactions/"+transaction_id+"/verify", auth=BearerAuth(BEARER_SAVERS)).json()
         return r["status"]
 
@@ -404,12 +405,16 @@ class Deposits:
             withdraw = Withdraws.getWithdrawsByGoalId(Withdraws, request, lang, goalid)
             withdraw_list = list(withdraw)
             networth = 0
+            totalNetworth = 0
+            new_networth = 0
             getDeposits = []
             goal = Goal.objects.filter(pk=goalid)
             for deposit in ddeposit:
                 amount = deposit.deposit_amount
+                networth = deposit.networth
                 totalDeposit += amount
-                networth = float((totalDeposit*0.15)+totalDeposit) - float(withdraw_list[0])
+                totalNetworth += networth
+                new_networth = float(totalNetworth) - float(withdraw_list[0])
                 for goals in goal:
                     getDeposits.append({
                         "deposit_id": deposit.id,
@@ -420,7 +425,7 @@ class Deposits:
                         "investment_option": deposit.investment_option.name,
                         "account_type": deposit.account_type.code_name
                     })
-            return totalDeposit, networth, getDeposits
+            return totalDeposit, new_networth, getDeposits
         else:
             return {
                 "0"
@@ -750,6 +755,7 @@ class Goals:
         dreminderday = request.data["deposit_reminder_day"]
         userid = request.user.id
         is_verified = request.user.userprofile.is_verified
+        is_active = True
         if is_verified is True:
             goal = Goal.objects.create(
                 goal=goalname,
@@ -757,7 +763,8 @@ class Goals:
                 goal_amount=goalamount,
                 user=User(pk=int(userid)),
                 deposit_type=deposittype,
-                deposit_reminder_day=dreminderday
+                deposit_reminder_day=dreminderday,
+                is_active=is_active
             )
             goal.save()
             goalid = goal.id
@@ -816,7 +823,8 @@ class Goals:
                     "deposit_reminder_day": goal.deposit_reminder_day,
                     "created": goal.created.strftime("%d %b"),
                     "deposit": deposit,
-                    "withdraw": withdraw
+                    "withdraw": withdraw,
+                    "goal_status": goal.is_active
                 }
                 )
             return totalUGX, totalUSD, goals
@@ -1284,9 +1292,8 @@ class Withdraws:
                 "0"
             }
 
-    def withdrawFromGoal(self, request, lang, goalid, user, transactionid):
+    def withdrawFromGoal(self, request, lang, goalid, user, transactionid, investment_option_id, units, withdraw_amount):
         withdraw_channel = request.data["withdraw_channel"]
-        withdraw_amount = request.data["withdraw_amount"]
         userid = request.user.id
         currency = request.data["currency"]
         account_type = request.data["account_type"]
@@ -1294,6 +1301,7 @@ class Withdraws:
         is_verified = request.user.userprofile.is_verified
         account_type = AccountType.objects.filter(code_name=account_type).get()
         status = "pending"
+        is_active = False
         # remember to verify the user
         if is_verified is True:
             # create withdraw transaction
@@ -1305,11 +1313,17 @@ class Withdraws:
                 account_type=account_type,
                 user=User(pk=int(userid)),
                 status=status,
-                transaction=BankTransaction(pk=int(transactionid))
+                transaction=BankTransaction(pk=int(transactionid)),
+                investment_option=InvestmentOption(pk=int(investment_option_id)),
+                units=units
             )
             withdrawid = withdraw.id
             withdraw.save()
             wwithdraw = self.getWithdrawById(request, lang, withdrawid)
+            # update goal to inactive
+            Goal.objects.filter(pk=goalid).update(
+                is_active=is_active
+            )
             goal = Goal.objects.filter(pk=goalid).get()
             goalname = goal.goal
             goal.save()

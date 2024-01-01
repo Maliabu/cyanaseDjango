@@ -453,20 +453,29 @@ class MakeDepositToGoal(APIView):
                 txRef = _refs.getTxRef()
                 tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
                 if tx_ref["success"] is False:
-                    # get percentages from analysis
-                    analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
-                    for any_analysis in analysis:
-                        # create a deposit rotating each in list
-                        # get new deposit amount
-                        new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
-                        new_investment_id = any_analysis["id"]
-                        units = _investmentOption.getInvestmentOptionById(request, lang, userid, new_investment_id, new_deposit_amount)
-                        deposit = _deposit.depositToGoal(request, lang, goalid, txRef, units, new_investment_id, new_deposit_amount)
-                    return Response({
-                        "message": "Deposits made successfully",
-                        "success": True,
-                        "type": "Automatic deposits made successfully"
-                    })
+                    # check if goal is active
+                    is_active = _goal.getGoalById(request, lang, goalid)
+                    if is_active["status"] is False:
+                        return Response({
+                            "message": "Goal is not active",
+                            "success": False,
+                            "type": "goal status"
+                        })
+                    else:
+                        # get percentages from analysis
+                        analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                        for any_analysis in analysis:
+                            # create a deposit rotating each in list
+                            # get new deposit amount
+                            new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
+                            new_investment_id = any_analysis["id"]
+                            units = _investmentOption.getInvestmentOptionById(request, lang, userid, new_investment_id, new_deposit_amount)
+                            _deposit.depositToGoal(request, lang, goalid, txRef, units, new_investment_id, new_deposit_amount)
+                        return Response({
+                            "message": "Deposits made successfully",
+                            "success": True,
+                            "type": "Automatic deposits made successfully"
+                        })
                 else:
                     return Response({
                         'message': "Something went wrong",
@@ -923,7 +932,6 @@ class MakeWithdrawFromBank(APIView):
                 if is_subscribed["status"] == "subscribed":
                     # get units
                     units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
-                    print("UNITS ACCUMULATED: ", units)
                     _type = ""
                     if withdraw_channel == "bank":
                         _type = "account"
@@ -995,7 +1003,7 @@ class MakeGoalWithdrawFromBank(APIView):
         account_type = request.data["account_type"]
         account_bank = request.data["account_bank"]
         account_number = request.data["account_number"]
-        goalid = request.data["goalid"]
+        goalid = request.data["goal_id"]
         narration = "Withdraw"
         beneficiary_name = user["last_name"]+" "+user["first_name"]
         is_verified = request.user.userprofile.is_verified
@@ -1031,6 +1039,7 @@ class MakeGoalWithdrawFromBank(APIView):
                 'success': False
             })
         elif not account_number:
+            print("I TRY OUT THE BANK OPTION")
             return Response({
                 'message': "This field is required",
                 "type": "account number",
@@ -1051,9 +1060,16 @@ class MakeGoalWithdrawFromBank(APIView):
         else:
             if is_verified is True:
                 if is_subscribed["status"] == "subscribed":
-                    # check goal status
-                    goal_status = _goal.getGoalById(request, lang, goalid)
-                    if goal_status["is_active"] is False:
+                    # check if goal is active
+                    is_active = _goal.getGoalById(request, lang, goalid)
+                    if is_active["status"] is False:
+                        return Response({
+                            "message": "Goal is not active",
+                            "success": False,
+                            "type": "goal status"
+                        })
+                    else:
+                        #proceed with transfer
                         _type = ""
                         if withdraw_channel == "bank":
                             _type = "account"
@@ -1062,6 +1078,7 @@ class MakeGoalWithdrawFromBank(APIView):
                         getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
                         total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
                         transactions = []
+                        tErrors = []
                         try:
                             rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
 
@@ -1074,33 +1091,39 @@ class MakeGoalWithdrawFromBank(APIView):
                                 "beneficiary_name": beneficiary_name
                             })
                             transactions.append(res)
-
                         except RaveExceptions.IncompletePaymentDetailsError as e:
-                            print(e)
-
+                            tErrors.append(e)
                         except RaveExceptions.InitiateTransferError as e:
-                            print(e.err)
-
+                            tErrors.append(e)
                         except RaveExceptions.TransferFetchError as e:
-                            print(e.err)
-
+                            tErrors.append(e)
                         except RaveExceptions.ServerError as e:
-                            print(e.err)
+                            tErrors.append(e)
                         if transactions[0]["error"] is False:
-                            transaction = _transaction.createTransfer(request,lang,transactions)
+                            transaction = _transaction.createTransfer(request, lang, transactions)
                             transactionid = transaction["transaction_id"]
-                            withdraw = _withdraw.withdrawFromGoal(request,lang,goalid,user,transactionid)
-                            return Response(withdraw)
-                    elif goal_status["is_active"] == True:
-                        return Response({
-                            "message": "This goal is done.",
-                            "success": False
-                        })
+                            # get percentages from analysis --- Risk profile
+                            analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                            for any_analysis in analysis:
+                                # create a deposit rotating each in list
+                                # get new deposit amount
+                                new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
+                                new_investment_id = any_analysis["id"]
+                                units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, new_investment_id, new_withdraw_amount)
+                                _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid, new_investment_id, units, new_withdraw_amount)
+                            return Response({
+                                "message": "Withdraws made successfully",
+                                "success": True,
+                                "type": "Automatic withdraws made successfully"
+                            })
+                        else:
+                            return Response({
+                                "message": transactions[0]["errMsg"],
+                                "success": False,
+                                "type": "withdraw amount"
+                            })
                 else:
                     substatus = is_subscribed["status"]
-                    time_left = is_subscribed["days_passed"]
-                    print(substatus)
-                    print(time_left)
                     return Response({
                         "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
                         "success": False
@@ -1268,12 +1291,12 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
         withdraw_channel = request.data["withdraw_channel"]
         withdraw_amount = request.data["withdraw_amount"]
         currency = request.data["currency"]
-        goalid = request.data["goalid"]
         account_type = request.data["account_type"]
         account_bank = request.data["account_bank"]
-        account_number = request.data["account_number"]
+        phone_number = request.data["phone_number"]
         beneficiary_name = user["last_name"]+" "+user["first_name"]
         is_verified = request.user.userprofile.is_verified
+        goalid = request.data["goalid"]
         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
             return {
@@ -1305,7 +1328,8 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                 "type": "account bank",
                 'success': False
             })
-        elif not account_number:
+        elif not phone_number:
+            print("I TRY OUT THE MM OPTION")
             return Response({
                 'message': "This field is required",
                 "type": "account number",
@@ -1317,28 +1341,32 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                 "type": "beneficiary name",
                 'success': False
             })
-        elif not goalid:
-            return Response({
-                'message': "This field is required",
-                "type": "goalid",
-                'success': False
-            })
         else:
             if is_verified is True:
-                if is_subscribed["status"] != "subscribed":
-                    _type = ""
-                    if withdraw_channel == "bank":
-                        _type = "account"
-                    if withdraw_channel == "mobile money":
-                        _type = "mobilemoney"
-                    getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency,_type)
-                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
-                    transactions = []
-                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
+                if is_subscribed["status"] == "subscribed":
+                    # check if goal is active
+                    is_active = _goal.getGoalById(request, lang, goalid)
+                    if is_active["status"] is False:
+                        return Response({
+                            "message": "Goal is not active",
+                            "success": False,
+                            "type": "goal status"
+                        })
+                    else:
+                        # proceed with transfer
+                        _type = ""
+                        if withdraw_channel == "bank":
+                            _type = "account"
+                        if withdraw_channel == "mobile money":
+                            _type = "mobilemoney"
+                        getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
+                        total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+                        transactions = []
+                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
 
-                    details = {
+                        details = {
                             "account_bank": account_bank,
-                            "account_number": account_number,
+                            "account_number": phone_number,
                             "amount": total_withdraw,
                             "currency": currency,
                             "beneficiary_name": beneficiary_name,
@@ -1346,18 +1374,37 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                                 "sender": "Flutterwave Developers",
                                 "sender_country": "ZA",
                                 "mobile_number": "23457558595"
-                                }
                             }
-                    res = rave.Transfer.initiate(details)
-                    transactions.append(res)
-                    if transactions[0]["error"] is False:
-                        transaction = _transaction.createTransfer(request, lang, transactions)
-                        transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid)
-                        return Response(withdraw)
+                        }
+                        res = rave.Transfer.initiate(details)
+                        transactions.append(res)
+                        if transactions[0]["error"] is False:
+                            transaction = _transaction.createTransfer(request, lang, transactions)
+                            transactionid = transaction["transaction_id"]
+                            # get percentages from analysis --- Risk profile
+                            analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                            for any_analysis in analysis:
+                                # create a deposit rotating each in list
+                                # get new deposit amount
+                                new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
+                                new_investment_id = any_analysis["id"]
+                                units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, new_investment_id, new_withdraw_amount)
+                                _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid, new_investment_id, units, new_withdraw_amount)
+                            return Response({
+                                "message": "Withdraws made successfully",
+                                "success": True,
+                                "type": "Automatic withdraws made successfully"
+                            })
+                        else:
+                            return Response({
+                                "message": transactions[0]["errMsg"],
+                                "success": False,
+                                "type": "withdraw amount"
+                            })
                 else:
+                    substatus = is_subscribed["status"]
                     return Response({
-                        "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
+                        "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
                         "success": False
                     })
             else:

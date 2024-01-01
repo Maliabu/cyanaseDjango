@@ -118,26 +118,6 @@ SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
 # SUB_PUB_KEY = "FLWPUBK-2f0d88d10a57d95acfd495bb18b32d43-X"
 # SUB_SEC_KEY = "FLWSECK-141bf374414b8733059148caa69def01-X"
 
-# Account details
-CARD_NUMBER = "5531 8866 5214 2950"
-CVV = "564"
-EXPIRY_DATE = "09/32"
-PIN = "3310"
-OTP = "12345"
-
-ACCOUNT_NUMBER = "0690000031"
-OTP = "12345"
-
-# Access Bank 2
-# ACCOUNT_NUMBER = "0690000032"
-# OTP = "12345"
-
-# CARD_NUMBER = "4187 4274 1556 4246"
-# CVV = "828"
-# EXPIRY_DATE = "09/32"
-# PIN = "3310"
-# OTP = "12345"
-
 # Verify
 VERIFY = "https://ravesandboxapi.flutterwave.com/flwv3-pug/getpaidx/api/v2/verify"
 # VERIFY = "https://api.ravepay.co/flwv3-pug/getpaidx/api/v2/verify"
