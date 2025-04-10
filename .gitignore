@@ -166,6 +166,10 @@ cython_debug/
 __pycache__
 db.sqlite3
 media
+api
+templates
+webapp
+assets
 
 # Backup files # 
 *.bak 
