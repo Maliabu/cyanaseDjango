@@ -6,21 +6,38 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from .v1.users.Users import Users
-from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths, BankTransactions, Subscriptions, TransactionRef, AccountTypes, InvestmentOptions
+from .services import Deposits, Goals, NextOfKins, RiskProfiles, Withdraws, Networths, BankTransactions, Subscriptions, TransactionRef, AccountTypes, InvestmentOptions, InvestmentClasses, InvestmentTracks, Transactions, PayTest
 from django.contrib.auth.models import User
 from rave_python import Rave, RaveExceptions,Misc
 import os
 import datetime
+import requests
 from cyanase_api import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .models import Transaction
+from .consumers import Consumer
+from asgiref.sync import async_to_sync
+import channels.layers
+import os, hashlib, warnings, requests, json
+import base64
+from Crypto.Cipher import DES3
 # from forex_python.converter import CurrencyRates
 
 # Create your views here.
 
 DEFAULT_LANG = "en"
-DEPOSIT_PUB_KEY = settings.DEPOSIT_PUB_KEY
-DEPOSIT_SEC_KEY = settings.DEPOSIT_SEC_KEY
-SUB_PUB_KEY = settings.SUB_PUB_KEY
-SUB_SEC_KEY = settings.SUB_SEC_KEY
+# sandbox
+# DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
+# DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
+# SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
+# SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
+
+# live
+DEPOSIT_PUB_KEY = "FLWPUBK-b248048d7e363a0497a7bf525c43d822-X"
+DEPOSIT_SEC_KEY = "FLWSECK-5c09157bff6ad1b4dc72207be91f6efe-X"
+SUB_PUB_KEY = "FLWPUBK-2f0d88d10a57d95acfd495bb18b32d43-X"
+SUB_SEC_KEY = "FLWSECK-141bf374414b8733059148caa69def01-X"
 
 _user = Users()
 _deposit = Deposits()
@@ -34,6 +51,11 @@ _subscription = Subscriptions()
 _refs = TransactionRef()
 _accountType = AccountTypes()
 _investmentOption = InvestmentOptions()
+_investmentClass = InvestmentClasses()
+_tracks = InvestmentTracks()
+_transactions = Transactions()
+_appCardFLWPay = PayTest()
+
 
 
 class index(APIView):
@@ -147,6 +169,7 @@ class MakeDeposit(APIView):
         reference_id = request.data["reference_id"]
         user = _user.getAuthUser(request, lang)
         userid = user["user_id"]
+        print(reference, reference_id)
         ##########################
         if not payment_means:
             return Response({
@@ -202,9 +225,10 @@ class MakeDeposit(APIView):
                 "type": "investment_id",
                 'success': False
             })
-        else:
+        elif str(reference)[0] == "F" and str(reference)[1] == "L" and str(reference)[2] == "W":
             # providers = _deposit.getLinkingProviders
             # print(providers)
+            # flutterwave request
             transaction_id = str(reference_id)
             verified = _deposit.verifyTransaction(transaction_id)
             # error or success - status returned (flutterwave)
@@ -213,20 +237,28 @@ class MakeDeposit(APIView):
                 tx_ref = _deposit.getTxRefById(request, lang, user, txRef)
                 if tx_ref["success"] is False:
                     if int(investment_id) != 0:
+                        # not risk profile
                         # get units
-                        units = _investmentOption.getInvestmentOptionById(request, lang, userid, investment_id, deposit_amount)
-                        deposit = _deposit.createDeposit(request, lang, txRef, units, investment_id, deposit_amount)
+                        risk_profile = False
+                        units = _investmentOption.getInvestmentOptionById(
+                            request, lang, userid, investment_id, deposit_amount)
+                        deposit = _deposit.createDeposit(
+                            request, lang, txRef, units, investment_id, deposit_amount, risk_profile)
                         return Response(deposit)
                     else:
                         # get percentages from analysis --- Risk profile
-                        analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                        risk_profile = True
+                        analysis = _riskprofile.getInvestmentByRiskProfile(
+                            request, lang)
                         for any_analysis in analysis:
                             # create a deposit rotating each in list
                             # get new deposit amount
                             new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
                             new_investment_id = any_analysis["id"]
-                            units = _investmentOption.getInvestmentOptionById(request, lang, userid, new_investment_id, new_deposit_amount)
-                            deposit = _deposit.createDeposit(request, lang, txRef, units, new_investment_id, new_deposit_amount)
+                            units = _investmentOption.getInvestmentOptionById(
+                                request, lang, userid, new_investment_id, new_deposit_amount)
+                            deposit = _deposit.createDeposit(
+                                request, lang, txRef, units, new_investment_id, new_deposit_amount, risk_profile)
                         return Response({
                             "message": "Deposits made successfully",
                             "success": True,
@@ -244,6 +276,137 @@ class MakeDeposit(APIView):
                     'success': False,
                     "type": "Transaction"
                 })
+        elif int(reference_id) == 1856231518:
+            # relworx request
+            # make deposit
+            # txRef and ref_id may be nullable here
+            # for only mobile money option
+            txRef = ""
+            if int(investment_id) != 0:
+                # not risk profile
+                # get units
+                risk_profile = False
+                units = _investmentOption.getInvestmentOptionById(
+                    request, lang, userid, investment_id, deposit_amount)
+                deposit = _deposit.createDeposit(
+                    request, lang, txRef, units, investment_id, deposit_amount, risk_profile)
+                return Response(deposit)
+            else:
+                # get percentages from analysis --- Risk profile
+                risk_profile = True
+                analysis = _riskprofile.getInvestmentByRiskProfile(
+                    request, lang)
+                for any_analysis in analysis:
+                    # create a deposit rotating each in list
+                    # get new deposit amount
+                    new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
+                    new_investment_id = any_analysis["id"]
+                    units = _investmentOption.getInvestmentOptionById(
+                        request, lang, userid, new_investment_id, new_deposit_amount)
+                    deposit = _deposit.createDeposit(
+                            request, lang, txRef, units, new_investment_id, new_deposit_amount, risk_profile)
+                    return Response({
+                        "message": "Deposits made successfully",
+                        "success": True,
+                        "type": "Automatic deposits made successfully"
+                    })
+        else:
+            return Response({
+                "message": "Unauthorised reference",
+                "success": False,
+                "type": "refrenece"
+            })
+
+
+class CardPay(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        rave = _appCardFLWPay.pay_via_card()
+        return Response(rave)
+
+
+class RequestPaymentHook(ObtainAuthToken):
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        status = request.data["status"]
+        if status == "success":
+            # create transaction
+            transaction = _transactions.newTransaction(request, lang)
+            if transaction["success"] is True:
+                return HttpResponse(200)
+            else:
+                return HttpResponse(200)
+
+
+class RequestDone(ObtainAuthToken):
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        message = request.data
+        request
+        channel_layer = channels.layers.get_channel_layer()
+        group = "transaction"
+        send = async_to_sync(channel_layer.send)(
+            group,
+            {
+                "type": "server-sent event",
+                "message": "How r u",
+            }
+        )
+        return Response({
+            "message": "Transaction Done",
+            "success": True,
+        })
+
+
+@receiver(post_save, sender=Transaction)
+def transaction_done(sender, instance, created, **kwargs):
+    if created:
+        print(instance)
+        # means webhook returned 200
+
+
+class ValidateMMNumber(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        msisdn = request.data
+        if msisdn:
+            validation = _deposit.Validate(msisdn)
+            return Response(validation)
+
+
+class RequestPayment(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        data = request.data
+        if data:
+            payment = _deposit.RequestPayment(data)
+            return Response(payment)
+
+
+class GetTransactionByReference(ObtainAuthToken):
+    http_method_names = ['post']
+    
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        data = request.data["internal_reference"]
+        if data:
+            transaction = _transactions.getTransactionByRef(request, lang, data)
+            return Response(transaction)
 
 
 class MakeDepositToBank(APIView):
@@ -464,18 +627,26 @@ class MakeDepositToGoal(APIView):
                     else:
                         # get percentages from analysis
                         analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
-                        for any_analysis in analysis:
-                            # create a deposit rotating each in list
-                            # get new deposit amount
-                            new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
-                            new_investment_id = any_analysis["id"]
-                            units = _investmentOption.getInvestmentOptionById(request, lang, userid, new_investment_id, new_deposit_amount)
-                            _deposit.depositToGoal(request, lang, goalid, txRef, units, new_investment_id, new_deposit_amount)
-                        return Response({
-                            "message": "Deposits made successfully",
-                            "success": True,
-                            "type": "Automatic deposits made successfully"
-                        })
+                        if len(analysis) != 0:
+                            for any_analysis in analysis:
+                                # create a deposit rotating each in list
+                                # get new deposit amount
+                                new_deposit_amount = float(any_analysis["percentage"])/100 * int(deposit_amount)
+                                new_investment_id = any_analysis["id"]
+                                units = _investmentOption.getInvestmentOptionById(request, lang, userid, new_investment_id, new_deposit_amount)
+                                _deposit.depositToGoal(request, lang, goalid, txRef, units, new_investment_id, new_deposit_amount)
+                            return Response({
+                                "message": "Deposits made successfully",
+                                "success": True,
+                                "type": "Automatic deposits made successfully"
+                            })
+                        else:
+                            # riskprofile is incomplete
+                            return Response({
+                                "message": "Incomplete Risk Profile",
+                                "success": False,
+                                "type": "Incomplete"
+                            })
                 else:
                     return Response({
                         'message': "Something went wrong",
@@ -496,11 +667,16 @@ class GetDepositsByAuthUser(APIView):
     http_method_names = ['get']
 
     def get(self, request, lang):
-        userid = request.user.id
-        user = _user.getAuthUserById(request, lang, userid)
         lang = DEFAULT_LANG if lang is None else lang
         deposit = _deposit.getAllDeposits(request, lang)
-        return Response(deposit)
+        if deposit['success'] is True:
+            return Response(deposit)
+        else:
+            return Response({
+                "message": "something went wrong",
+                "success": False,
+                "data": []
+            })
 
 
 class GetDepositsById(APIView):
@@ -668,10 +844,21 @@ class GetGoalsByAuthUser(APIView):
     http_method_names = ['get']
 
     def get(self, request, lang):
-        userid = request.user.id
-        user = _user.getAuthUserById(request, lang, userid)
         lang = DEFAULT_LANG if lang is None else lang
         goal = _goal.getAllUserGoals(request, lang)
+        return Response(goal)
+
+
+class DeleteGoalById(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
+        print(request.data)
+        goalid = request.data['goalid']
+        goal = _goal.deleteGoalById(request, lang, goalid)
         return Response(goal)
 
 
@@ -756,6 +943,7 @@ class AddRiskProfile(APIView):
         qn11 = request.data["qn11"]
         score = request.data["score"]
         risk_analysis = request.data["risk_analysis"]
+        print(request.data)
         if not qn1:
             return {
                 "message": "This field is required",
@@ -863,6 +1051,133 @@ class GetCountryBanks(APIView):
         return Response(banks)
 
 
+# with transfer transactions
+# class MakeWithdrawFromBank(APIView):
+#     authentication_classes = [SessionAuthentication, TokenAuthentication]
+#     permission_classes = [IsAuthenticated]
+#     http_method_names = ['post']
+
+#     def post(self, request, lang, *args, **kwargs):
+#         user = _user.getAuthUser(request, lang)
+#         userid = user["user_id"]
+#         lang = DEFAULT_LANG if lang is None else lang
+#         withdraw_channel = request.data["withdraw_channel"]
+#         withdraw_amount = request.data["withdraw_amount"]
+#         currency = request.data["currency"]
+#         account_type = request.data["account_type"]
+#         account_bank = request.data["account_bank"]
+#         account_number = request.data["account_number"]
+#         narration = "Withdraw"
+#         investment_option_id = request.data["investment_id"]
+#         beneficiary_name = user["last_name"]+" "+user["first_name"]
+#         is_verified = request.user.userprofile.is_verified
+#         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
+#         if not withdraw_channel:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw channel"
+#             }
+#         elif not account_type:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account_type",
+#                 'success': False
+#             })
+#         elif not withdraw_amount:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw amount"
+#             }
+#         elif not currency:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "currency",
+#                 'success': False
+#             })
+#         elif not account_bank:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account bank",
+#                 'success': False
+#             })
+#         elif not account_number:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account number",
+#                 'success': False
+#             })
+#         elif not beneficiary_name:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "beneficiary name",
+#                 'success': False
+#             })
+#         else:
+#             # if verified user
+#             if is_verified is True:
+#                 # if subscribed
+#                 if is_subscribed["status"] == "subscribed":
+#                     # get units
+#                     units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
+#                     _type = ""
+#                     if withdraw_channel == "bank":
+#                         _type = "account"
+#                     if withdraw_channel == "mobile money":
+#                         _type = "mobilemoney"
+#                     getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
+#                     total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+#                     transactions = []
+#                     tErrors = []
+#                     try:
+#                         rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
+
+#                         res = rave.Transfer.initiate({
+#                             "account_bank": account_bank,
+#                             "account_number": account_number,
+#                             "amount": total_withdraw,
+#                             "narration": narration,
+#                             "currency": currency,
+#                             "beneficiary_name": beneficiary_name
+#                         })
+#                         transactions.append(res)
+#                     except RaveExceptions.IncompletePaymentDetailsError as e:
+#                         tErrors.append(e)
+#                     except RaveExceptions.InitiateTransferError as e:
+#                         tErrors.append(e)
+#                     except RaveExceptions.TransferFetchError as e:
+#                         tErrors.append(e)
+#                     except RaveExceptions.ServerError as e:
+#                         tErrors.append(e)
+#                     # if all is well, create bank transaction
+#                     if transactions[0]["error"] is False:
+#                         transaction = _transaction.createTransfer(request, lang, transactions)
+#                         transactionid = transaction["transaction_id"]
+#                         withdraw = _withdraw.withdraw(request, lang, user, transactionid, investment_option_id, units)
+#                         return Response(withdraw)
+#                     else:
+#                         return Response({
+#                             "message": transactions[0]["errMsg"],
+#                             "success": False,
+#                             "type": "withdraw amount"
+#                         })
+#                 else:
+#                     # not subscribed
+#                     substatus = is_subscribed["status"]
+#                     return Response({
+#                         "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
+#                         "success": False
+#                     })
+#             else:
+#                 # not verified user
+#                 return Response({
+#                     "message": "your account is not verified, please check your email and verify",
+#                     "success": False
+#                 })
+
+
+# without transfer transaction
 class MakeWithdrawFromBank(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -878,7 +1193,6 @@ class MakeWithdrawFromBank(APIView):
         account_type = request.data["account_type"]
         account_bank = request.data["account_bank"]
         account_number = request.data["account_number"]
-        narration = "Withdraw"
         investment_option_id = request.data["investment_id"]
         beneficiary_name = user["last_name"]+" "+user["first_name"]
         is_verified = request.user.userprofile.is_verified
@@ -929,49 +1243,33 @@ class MakeWithdrawFromBank(APIView):
             # if verified user
             if is_verified is True:
                 # if subscribed
-                if is_subscribed["status"] == "subscribed":
-                    # get units
-                    units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
-                    _type = ""
-                    if withdraw_channel == "bank":
-                        _type = "account"
-                    if withdraw_channel == "mobile money":
-                        _type = "mobilemoney"
-                    getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
-                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
-                    transactions = []
-                    tErrors = []
-                    try:
-                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
-
-                        res = rave.Transfer.initiate({
-                            "account_bank": account_bank,
-                            "account_number": account_number,
-                            "amount": total_withdraw,
-                            "narration": narration,
-                            "currency": currency,
-                            "beneficiary_name": beneficiary_name
-                        })
-                        transactions.append(res)
-                    except RaveExceptions.IncompletePaymentDetailsError as e:
-                        tErrors.append(e)
-                    except RaveExceptions.InitiateTransferError as e:
-                        tErrors.append(e)
-                    except RaveExceptions.TransferFetchError as e:
-                        tErrors.append(e)
-                    except RaveExceptions.ServerError as e:
-                        tErrors.append(e)
-                    # if all is well
-                    if transactions[0]["error"] is False:
-                        transaction = _transaction.createTransfer(request, lang, transactions)
-                        transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdraw(request, lang, user, transactionid, investment_option_id, units)
+                if is_subscribed["status"] != "subscribed":
+                    # check risk profile
+                    if int(investment_option_id) != 0:
+                        # not risk profile withdraw request
+                        # get units
+                        units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
+                        # send withdraw request to fund manager
+                        withdraw = _withdraw.withdraw(request, lang, user, investment_option_id, units, withdraw_amount)
                         return Response(withdraw)
                     else:
+                        # risk profile withdraw request
+                        # get percentages from analysis --- Risk profile
+                        analysis = _riskprofile.getInvestmentByRiskProfile(
+                            request, lang)
+                        for any_analysis in analysis:
+                            # create a withdraw rotating each in list
+                            # get new withdraw amount divided into risk profile amounts
+                            new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
+                            new_investment_id = any_analysis["id"]
+                            units = _investmentOption.getInvestmentOptionById(
+                                request, lang, userid, new_investment_id, new_withdraw_amount)
+                            withdraw = _withdraw.withdraw(
+                                request, lang, txRef, units, new_investment_id, new_withdraw_amount)
                         return Response({
-                            "message": transactions[0]["errMsg"],
-                            "success": False,
-                            "type": "withdraw amount"
+                            "message": "Your withdraw is now pending",
+                            "success": True,
+                            "type": "Automatic withdraws made successfully"
                         })
                 else:
                     # not subscribed
@@ -988,6 +1286,163 @@ class MakeWithdrawFromBank(APIView):
                 })
 
 
+# with transfer transactions
+# class MakeGoalWithdrawFromBank(APIView):
+#     authentication_classes = [SessionAuthentication, TokenAuthentication]
+#     permission_classes = [IsAuthenticated]
+#     http_method_names = ['post']
+
+#     def post(self, request, lang, *args, **kwargs):
+#         user = _user.getAuthUser(request, lang)
+#         userid = user["user_id"]
+#         lang = DEFAULT_LANG if lang is None else lang
+#         withdraw_channel = request.data["withdraw_channel"]
+#         withdraw_amount = request.data["withdraw_amount"]
+#         currency = request.data["currency"]
+#         account_type = request.data["account_type"]
+#         account_bank = request.data["account_bank"]
+#         account_number = request.data["account_number"]
+#         goalid = request.data["goal_id"]
+#         narration = "Withdraw"
+#         beneficiary_name = user["last_name"]+" "+user["first_name"]
+#         is_verified = request.user.userprofile.is_verified
+#         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
+#         if not withdraw_channel:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw channel"
+#             }
+#         elif not account_type:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account_type",
+#                 'success': False
+#             })
+#         elif not withdraw_amount:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw amount"
+#             }
+#         elif not currency:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "currency",
+#                 'success': False
+#             })
+#         elif not account_bank:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account bank",
+#                 'success': False
+#             })
+#         elif not account_number:
+#             print("I TRY OUT THE BANK OPTION")
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account number",
+#                 'success': False
+#             })
+#         elif not beneficiary_name:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "beneficiary name",
+#                 'success': False
+#             })
+#         elif not goalid:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "goalid",
+#                 'success': False
+#             })
+#         else:
+#             if is_verified is True:
+#                 if is_subscribed["status"] == "subscribed":
+#                     # check if goal is active
+#                     is_active = _goal.getGoalById(request, lang, goalid)
+#                     if is_active["status"] is False:
+#                         return Response({
+#                             "message": "Goal is not active",
+#                             "success": False,
+#                             "type": "goal status"
+#                         })
+#                     else:
+#                         #proceed with transfer
+#                         _type = ""
+#                         if withdraw_channel == "bank":
+#                             _type = "account"
+#                         if withdraw_channel == "mobile money":
+#                             _type = "mobilemoney"
+#                         getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
+#                         total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+#                         transactions = []
+#                         tErrors = []
+#                         try:
+#                             rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
+
+#                             res = rave.Transfer.initiate({
+#                                 "account_bank": account_bank,
+#                                 "account_number": account_number,
+#                                 "amount": total_withdraw,
+#                                 "narration": narration,
+#                                 "currency": currency,
+#                                 "beneficiary_name": beneficiary_name
+#                             })
+#                             transactions.append(res)
+#                         except RaveExceptions.IncompletePaymentDetailsError as e:
+#                             tErrors.append(e)
+#                         except RaveExceptions.InitiateTransferError as e:
+#                             tErrors.append(e)
+#                         except RaveExceptions.TransferFetchError as e:
+#                             tErrors.append(e)
+#                         except RaveExceptions.ServerError as e:
+#                             tErrors.append(e)
+#                         if transactions[0]["error"] is False:
+#                             transaction = _transaction.createTransfer(request, lang, transactions)
+#                             transactionid = transaction["transaction_id"]
+#                             # get percentages from analysis --- Risk profile
+#                             analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+#                             if len(analysis) != 0:
+#                                 for any_analysis in analysis:
+#                                     # create a deposit rotating each in list
+#                                     # get new deposit amount
+#                                     new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
+#                                     new_investment_id = any_analysis["id"]
+#                                     units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, new_investment_id, new_withdraw_amount)
+#                                     _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid, new_investment_id, units, new_withdraw_amount)
+#                                 return Response({
+#                                     "message": "Withdraws made successfully",
+#                                     "success": True,
+#                                     "type": "Automatic withdraws made successfully"
+#                                 })
+#                             else:
+#                                 # empty list means Incomplete Risk Profile
+#                                 return Response({
+#                                     "message": "Incomplete Risk Profile",
+#                                     "success": False,
+#                                     "type": "Incomplete"
+#                                 })
+#                         else:
+#                             return Response({
+#                                 "message": transactions[0]["errMsg"],
+#                                 "success": False,
+#                                 "type": "withdraw amount"
+#                             })
+#                 else:
+#                     substatus = is_subscribed["status"]
+#                     return Response({
+#                         "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
+#                         "success": False
+#                     })
+#             else:
+#                 return Response({
+#                     "message": "your account is not verified, please check your email and verify",
+#                     "success": False
+#                 })
+
+
+# without transfer transactions
 class MakeGoalWithdrawFromBank(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -1004,7 +1459,6 @@ class MakeGoalWithdrawFromBank(APIView):
         account_bank = request.data["account_bank"]
         account_number = request.data["account_number"]
         goalid = request.data["goal_id"]
-        narration = "Withdraw"
         beneficiary_name = user["last_name"]+" "+user["first_name"]
         is_verified = request.user.userprofile.is_verified
         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
@@ -1039,7 +1493,6 @@ class MakeGoalWithdrawFromBank(APIView):
                 'success': False
             })
         elif not account_number:
-            print("I TRY OUT THE BANK OPTION")
             return Response({
                 'message': "This field is required",
                 "type": "account number",
@@ -1069,58 +1522,26 @@ class MakeGoalWithdrawFromBank(APIView):
                             "type": "goal status"
                         })
                     else:
-                        #proceed with transfer
-                        _type = ""
-                        if withdraw_channel == "bank":
-                            _type = "account"
-                        if withdraw_channel == "mobile money":
-                            _type = "mobilemoney"
-                        getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
-                        total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
-                        transactions = []
-                        tErrors = []
-                        try:
-                            rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
-
-                            res = rave.Transfer.initiate({
-                                "account_bank": account_bank,
-                                "account_number": account_number,
-                                "amount": total_withdraw,
-                                "narration": narration,
-                                "currency": currency,
-                                "beneficiary_name": beneficiary_name
-                            })
-                            transactions.append(res)
-                        except RaveExceptions.IncompletePaymentDetailsError as e:
-                            tErrors.append(e)
-                        except RaveExceptions.InitiateTransferError as e:
-                            tErrors.append(e)
-                        except RaveExceptions.TransferFetchError as e:
-                            tErrors.append(e)
-                        except RaveExceptions.ServerError as e:
-                            tErrors.append(e)
-                        if transactions[0]["error"] is False:
-                            transaction = _transaction.createTransfer(request, lang, transactions)
-                            transactionid = transaction["transaction_id"]
-                            # get percentages from analysis --- Risk profile
-                            analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                        # get percentages from analysis --- Risk profile
+                        analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                        if len(analysis) != 0:
                             for any_analysis in analysis:
-                                # create a deposit rotating each in list
                                 # get new deposit amount
                                 new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
                                 new_investment_id = any_analysis["id"]
                                 units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, new_investment_id, new_withdraw_amount)
-                                _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid, new_investment_id, units, new_withdraw_amount)
+                                _withdraw.withdrawFromGoal(request, lang, goalid, user, new_investment_id, units, new_withdraw_amount)
                             return Response({
                                 "message": "Withdraws made successfully",
                                 "success": True,
                                 "type": "Automatic withdraws made successfully"
                             })
                         else:
+                            # empty list means Incomplete Risk Profile
                             return Response({
-                                "message": transactions[0]["errMsg"],
+                                "message": "Incomplete Risk Profile",
                                 "success": False,
-                                "type": "withdraw amount"
+                                "type": "Incomplete"
                             })
                 else:
                     substatus = is_subscribed["status"]
@@ -1133,7 +1554,6 @@ class MakeGoalWithdrawFromBank(APIView):
                     "message": "your account is not verified, please check your email and verify",
                     "success": False
                 })
-
 
 class GetWithdrawFee(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
@@ -1168,6 +1588,119 @@ class GetWithdrawFee(APIView):
             return Response(withdraw_fee)
 
 
+# with transfer transactions
+# class MakeWithdrawFromMobileMoney(APIView):
+#     authentication_classes = [SessionAuthentication, TokenAuthentication]
+#     permission_classes = [IsAuthenticated]
+#     http_method_names = ['post']
+
+#     def post(self, request, lang, *args, **kwargs):
+#         user = _user.getAuthUser(request, lang)
+#         userid = user["user_id"]
+#         lang = DEFAULT_LANG if lang is None else lang
+#         withdraw_channel = request.data["withdraw_channel"]
+#         withdraw_amount = request.data["withdraw_amount"]
+#         currency = request.data["currency"]
+#         account_type = request.data["account_type"]
+#         account_bank = request.data["account_bank"]
+#         phone_number = request.data["phone_number"]
+#         beneficiary_name = user["last_name"]+" "+user["first_name"]
+#         investment_option_id = request.data["investment_id"]
+#         is_verified = request.user.userprofile.is_verified
+#         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
+#         if not withdraw_channel:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw channel"
+#             }
+#         elif not withdraw_amount:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw amount"
+#             }
+#         elif not account_type:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account_type",
+#                 'success': False
+#             })
+#         elif not currency:
+#             return Response({
+#                 'message': "This is required",
+#                 "type": "currency",
+#                 'success': False
+#             })
+#         elif not account_bank:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account bank",
+#                 'success': False
+#             })
+#         elif not phone_number:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account number",
+#                 'success': False
+#             })
+#         elif not beneficiary_name:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "beneficiary name",
+#                 'success': False
+#             })
+#         else:
+#             # if verified user
+#             if is_verified is True:
+#                 # if subscribed
+#                 if is_subscribed["status"] == "subscribed":
+#                     # get units
+#                     units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
+#                     _type = ""
+#                     if withdraw_channel == "bank":
+#                         _type = "account"
+#                     if withdraw_channel == "mobile money":
+#                         _type = "mobilemoney"
+#                     getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
+#                     total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+#                     transactions = []
+#                     rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
+
+#                     details = {
+#                             "account_bank": account_bank,
+#                             "account_number": phone_number,
+#                             "amount": total_withdraw,
+#                             "currency": currency,
+#                             "beneficiary_name": beneficiary_name,
+#                             "meta": {
+#                                 "sender": "Flutterwave Developers",
+#                                 "sender_country": "ZA",
+#                                 "mobile_number": "23457558595"
+#                                 }
+#                             }
+#                     res = rave.Transfer.initiate(details)
+#                     transactions.append(res)
+#                     if transactions[0]["error"] is False:
+#                         transaction = _transaction.createTransfer(request, lang, transactions)
+#                         transactionid = transaction["transaction_id"]
+#                         withdraw = _withdraw.withdraw(request, lang, user, transactionid, investment_option_id, units)
+#                         return Response(withdraw)
+#                 else:
+#                     return Response({
+#                         "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
+#                         "success": False,
+#                         "type": "subscription"
+#                     })
+#             else:
+#                 return Response({
+#                     "message": "your account is not verified, please check your email and verify",
+#                     "success": False,
+#                     "type": "verification"
+#                 })
+
+
+# without transfer transactions
 class MakeWithdrawFromMobileMoney(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -1182,23 +1715,24 @@ class MakeWithdrawFromMobileMoney(APIView):
         currency = request.data["currency"]
         account_type = request.data["account_type"]
         account_bank = request.data["account_bank"]
+        # phone number
         phone_number = request.data["phone_number"]
         beneficiary_name = user["last_name"]+" "+user["first_name"]
         investment_option_id = request.data["investment_id"]
         is_verified = request.user.userprofile.is_verified
         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
-            return {
+            return Response({
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw channel"
-            }
+            })
         elif not withdraw_amount:
-            return {
+            return Response({
                 "message": "This field is required",
                 "success": False,
                 "type": "withdraw amount"
-            }
+            })
         elif not account_type:
             return Response({
                 'message': "This field is required",
@@ -1236,36 +1770,11 @@ class MakeWithdrawFromMobileMoney(APIView):
                 if is_subscribed["status"] == "subscribed":
                     # get units
                     units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, investment_option_id, withdraw_amount)
-                    _type = ""
-                    if withdraw_channel == "bank":
-                        _type = "account"
-                    if withdraw_channel == "mobile money":
-                        _type = "mobilemoney"
-                    getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
-                    total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
-                    transactions = []
-                    rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
-
-                    details = {
-                            "account_bank": account_bank,
-                            "account_number": phone_number,
-                            "amount": total_withdraw,
-                            "currency": currency,
-                            "beneficiary_name": beneficiary_name,
-                            "meta": {
-                                "sender": "Flutterwave Developers",
-                                "sender_country": "ZA",
-                                "mobile_number": "23457558595"
-                                }
-                            }
-                    res = rave.Transfer.initiate(details)
-                    transactions.append(res)
-                    if transactions[0]["error"] is False:
-                        transaction = _transaction.createTransfer(request, lang, transactions)
-                        transactionid = transaction["transaction_id"]
-                        withdraw = _withdraw.withdraw(request, lang, user, transactionid, investment_option_id, units)
-                        return Response(withdraw)
+                    withdraw = _withdraw.withdraw(request, lang, user, investment_option_id, units)
+                    print(withdraw)
+                    return Response(withdraw)
                 else:
+                    print('not subscribed at all')
                     return Response({
                         "message": "your account subscription is overdue, withdraw may not proceed till you subscribe",
                         "success": False,
@@ -1279,6 +1788,143 @@ class MakeWithdrawFromMobileMoney(APIView):
                 })
 
 
+# with transfer transactions
+# class MakeGoalWithdrawFromMobileMoney(APIView):
+#     authentication_classes = [SessionAuthentication, TokenAuthentication]
+#     permission_classes = [IsAuthenticated]
+#     http_method_names = ['post']
+
+#     def post(self, request, lang, *args, **kwargs):
+#         user = _user.getAuthUser(request, lang)
+#         userid = user["user_id"]
+#         lang = DEFAULT_LANG if lang is None else lang
+#         withdraw_channel = request.data["withdraw_channel"]
+#         withdraw_amount = request.data["withdraw_amount"]
+#         currency = request.data["currency"]
+#         account_type = request.data["account_type"]
+#         account_bank = request.data["account_bank"]
+#         phone_number = request.data["phone_number"]
+#         beneficiary_name = user["last_name"]+" "+user["first_name"]
+#         is_verified = request.user.userprofile.is_verified
+#         goalid = request.data["goalid"]
+#         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
+#         if not withdraw_channel:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw channel"
+#             }
+#         elif not withdraw_amount:
+#             return {
+#                 "message": "This field is required",
+#                 "success": False,
+#                 "type": "withdraw amount"
+#             }
+#         elif not account_type:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account_type",
+#                 'success': False
+#             })
+#         elif not currency:
+#             return Response({
+#                 'message': "This is required",
+#                 "type": "currency",
+#                 'success': False
+#             })
+#         elif not account_bank:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account bank",
+#                 'success': False
+#             })
+#         elif not phone_number:
+#             print("I TRY OUT THE MM OPTION")
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "account number",
+#                 'success': False
+#             })
+#         elif not beneficiary_name:
+#             return Response({
+#                 'message': "This field is required",
+#                 "type": "beneficiary name",
+#                 'success': False
+#             })
+#         else:
+#             if is_verified is True:
+#                 if is_subscribed["status"] == "subscribed":
+#                     # check if goal is active
+#                     is_active = _goal.getGoalById(request, lang, goalid)
+#                     if is_active["status"] is False:
+#                         return Response({
+#                             "message": "Goal is not active",
+#                             "success": False,
+#                             "type": "goal status"
+#                         })
+#                     else:
+#                         # proceed with transfer
+#                         _type = ""
+#                         if withdraw_channel == "bank":
+#                             _type = "account"
+#                         if withdraw_channel == "mobile money":
+#                             _type = "mobilemoney"
+#                         getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
+#                         total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
+#                         transactions = []
+#                         rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
+
+#                         details = {
+#                             "account_bank": account_bank,
+#                             "account_number": phone_number,
+#                             "amount": total_withdraw,
+#                             "currency": currency,
+#                             "beneficiary_name": beneficiary_name,
+#                             "meta": {
+#                                 "sender": "Flutterwave Developers",
+#                                 "sender_country": "ZA",
+#                                 "mobile_number": "23457558595"
+#                             }
+#                         }
+#                         res = rave.Transfer.initiate(details)
+#                         transactions.append(res)
+#                         if transactions[0]["error"] is False:
+#                             transaction = _transaction.createTransfer(request, lang, transactions)
+#                             transactionid = transaction["transaction_id"]
+#                             # get percentages from analysis --- Risk profile
+#                             analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+#                             for any_analysis in analysis:
+#                                 # create a deposit rotating each in list
+#                                 # get new deposit amount
+#                                 new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
+#                                 new_investment_id = any_analysis["id"]
+#                                 units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, new_investment_id, new_withdraw_amount)
+#                                 _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid, new_investment_id, units, new_withdraw_amount)
+#                             return Response({
+#                                 "message": "Withdraws made successfully",
+#                                 "success": True,
+#                                 "type": "Automatic withdraws made successfully"
+#                             })
+#                         else:
+#                             return Response({
+#                                 "message": transactions[0]["errMsg"],
+#                                 "success": False,
+#                                 "type": "withdraw amount"
+#                             })
+#                 else:
+#                     substatus = is_subscribed["status"]
+#                     return Response({
+#                         "message": "your account subscription is "+substatus+", withdraw may not proceed till you subscribe",
+#                         "success": False
+#                     })
+#             else:
+#                 return Response({
+#                     "message": "your account is not verified, please check your email and verify",
+#                     "success": False
+#                 })
+
+
+#without transfer transactions
 class MakeGoalWithdrawFromMobileMoney(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -1296,7 +1942,7 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
         phone_number = request.data["phone_number"]
         beneficiary_name = user["last_name"]+" "+user["first_name"]
         is_verified = request.user.userprofile.is_verified
-        goalid = request.data["goalid"]
+        goalid = request.data["goal_id"]
         is_subscribed = _subscription.getSubscriptionStatus(request, lang, userid)
         if not withdraw_channel:
             return {
@@ -1329,7 +1975,6 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                 'success': False
             })
         elif not phone_number:
-            print("I TRY OUT THE MM OPTION")
             return Response({
                 'message': "This field is required",
                 "type": "account number",
@@ -1353,54 +1998,19 @@ class MakeGoalWithdrawFromMobileMoney(APIView):
                             "type": "goal status"
                         })
                     else:
-                        # proceed with transfer
-                        _type = ""
-                        if withdraw_channel == "bank":
-                            _type = "account"
-                        if withdraw_channel == "mobile money":
-                            _type = "mobilemoney"
-                        getWithdrawFee = _withdraw.getWithdrawfee(request, lang, userid, withdraw_amount, currency, _type)
-                        total_withdraw = float(withdraw_amount) - float(getWithdrawFee)
-                        transactions = []
-                        rave = Rave(DEPOSIT_PUB_KEY, DEPOSIT_SEC_KEY, usingEnv=False)
-
-                        details = {
-                            "account_bank": account_bank,
-                            "account_number": phone_number,
-                            "amount": total_withdraw,
-                            "currency": currency,
-                            "beneficiary_name": beneficiary_name,
-                            "meta": {
-                                "sender": "Flutterwave Developers",
-                                "sender_country": "ZA",
-                                "mobile_number": "23457558595"
-                            }
-                        }
-                        res = rave.Transfer.initiate(details)
-                        transactions.append(res)
-                        if transactions[0]["error"] is False:
-                            transaction = _transaction.createTransfer(request, lang, transactions)
-                            transactionid = transaction["transaction_id"]
-                            # get percentages from analysis --- Risk profile
-                            analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
-                            for any_analysis in analysis:
-                                # create a deposit rotating each in list
-                                # get new deposit amount
-                                new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
-                                new_investment_id = any_analysis["id"]
-                                units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, new_investment_id, new_withdraw_amount)
-                                _withdraw.withdrawFromGoal(request, lang, goalid, user, transactionid, new_investment_id, units, new_withdraw_amount)
-                            return Response({
-                                "message": "Withdraws made successfully",
-                                "success": True,
-                                "type": "Automatic withdraws made successfully"
-                            })
-                        else:
-                            return Response({
-                                "message": transactions[0]["errMsg"],
-                                "success": False,
-                                "type": "withdraw amount"
-                            })
+                        # get percentages from analysis --- Risk profile
+                        analysis = _riskprofile.getInvestmentByRiskProfile(request, lang)
+                        for any_analysis in analysis:
+                            # get new deposit amount
+                            new_withdraw_amount = float(any_analysis["percentage"])/100 * int(withdraw_amount)
+                            new_investment_id = any_analysis["id"]
+                            units = _investmentOption.getWithdrawInvestmentOptionById(request, lang, userid, new_investment_id, new_withdraw_amount)
+                            _withdraw.withdrawFromGoal(request, lang, goalid, user, new_investment_id, units, new_withdraw_amount)
+                        return Response({
+                            "message": "Withdraws made successfully",
+                            "success": True,
+                            "type": "Automatic withdraws made successfully"
+                        })
                 else:
                     substatus = is_subscribed["status"]
                     return Response({
@@ -1434,8 +2044,9 @@ class GetInvestmentWithdraws(APIView):
 
     def get(self, request, lang):
         userid = request.user.id
+        investment_option_id = 0
         lang = DEFAULT_LANG if lang is None else lang
-        withdraw = _withdraw.getWithdrawsByInvestmentOption(request, lang, userid)
+        withdraw = _withdraw.getWithdrawsByInvestmentOption(request, lang, userid, investment_option_id)
         return Response(withdraw)
 
 
@@ -1480,6 +2091,48 @@ class GetInvestmentOptionByName(APIView):
         userid = request.user.id
         lang = DEFAULT_LANG if lang is None else lang
         options = _investmentOption.getInvestmentOptionByName(request, lang, userid, option=investment_option)
+        return Response(options)
+
+
+class GetInvestmentClasses(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang):
+        userid = request.user.id
+        lang = DEFAULT_LANG if lang is None else lang
+        investment_classes = _investmentClass.getInvestmentClassesWithOptions(request, lang, userid)
+        return Response(investment_classes)
+
+
+# trialNumCheck = "45,678"
+# result = ''.join(letter for letter in trialNumCheck if letter.isnumeric())
+
+class GetInvestmentOptionsByClass(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        investment_class = request.data["class"]
+        fund_manager = request.data["fund_id"]
+        userid = request.user.id
+        lang = DEFAULT_LANG if lang is None else lang
+        options = _investmentOption.getInvestmentOptionsByClass(request, lang, userid, investment_class, fund_manager)
+        return Response(options)
+
+
+class GetInvestmentOptionsByFund(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        fid = request.data
+        userid = request.user.id
+        lang = DEFAULT_LANG if lang is None else lang
+        options = _investmentOption.getInvestmentOptionsByFund(request, lang, userid, fid)
         return Response(options)
 
 
@@ -1751,3 +2404,68 @@ class GetUserActualNetworthData(APIView):
 #         userid = request.user.id
 #         user_deposit = _deposit.getDepositsByInvestmentOption(request, lang, userid)
 #         return Response(user_deposit)
+
+
+class OnboardInvestmentTrack(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        userid = request.user.id
+        deposits = _deposit.getAllDeposits(request, lang)
+        withdraws = _withdraw.getAllWithdraws(request, lang, userid)
+        if len(deposits) <= 0:
+            return Response({
+                "message": "No deposit data",
+                "success": False
+            })
+        elif len(withdraws) <= 0:
+            return Response({
+                "message": "No withdraw data",
+                "success": False
+            })
+        else:
+            # create investment tracks for each user
+            _tracks.CreateInvestmentTracks(request, lang)
+            return Response({
+                "message": "investment tracks created successfully",
+                "success": True
+            })
+
+
+class GetUserInvestmentTrack(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        userid = request.user.id
+        user_track = _tracks.getUserInvestmentTrack(
+            request, lang, userid)
+        return Response(user_track)
+
+
+class OnboardOrtusUsersTrack(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        # userid, provide in url
+        user_track = request.data
+        if len(user_track) <= 0:
+            return Response({
+                "message": "No track data",
+                "success": False
+            })
+        else:
+            for user_data in user_track:
+                # am assuming you have all data
+                # create investment tracks for each user
+                _tracks.CreateOrtusUsersTrack(request, lang, user_data)
+            return Response({
+                "message": "investment tracks created successfully",
+                "success": True
+            })

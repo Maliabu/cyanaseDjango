@@ -4,6 +4,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from datetime import date
 from django.utils.translation import gettext_lazy as _
+import channels.layers
+from asgiref.sync import async_to_sync
 
 
 class SupportedLanguage(models.Model):
@@ -92,6 +94,8 @@ class UserProfile(models.Model):
     is_verified = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=True)
     is_disabled = models.BooleanField(default=False)
+    is_logged_in = models.BooleanField(default=False)
+    passcode = models.CharField(max_length=255, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -107,6 +111,17 @@ def create_user_profile(sender, instance, created, **kwargs):
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     instance.userprofile.save()
+
+
+class Message(models.Model):
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sender")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='receiver')
+    content = models.CharField(max_length=255, null=True, blank=True)
+    read = models.BooleanField(default=False)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.sender}: {self.content}'
 
 
 class NextOfKin(models.Model):
@@ -204,6 +219,18 @@ class Currency(models.Model):
     is_default = models.BooleanField(default=False)
     is_disabled = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)
+    
+    # def save(self, *args, **kwargs):
+    # super().save(*args, **kwargs)
+    # channel_layer = channels.layers.get_channel_layer()
+    # group = f"job-posting-{self.user.id}"
+    # async_to_sync(channel_layer.group_send)(
+    #     group,
+    #     {
+    #         "type": "propagate_status",
+    #         "message": {"id": self.id, "state": self.state},
+    #     },
+    # )
 
     def __str__(self):
         return "%s" % self.currency_locale
@@ -444,12 +471,15 @@ class Goal(models.Model):
     deposit_type = models.CharField(max_length=200, null=True)
     deposit_reminder_day = models.CharField(max_length=200, null=True)
     is_active = models.BooleanField(default=False)
+    goal_picture = models.ImageField(
+        upload_to="goal", default="default_picture.jpg"
+    )
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return "%s - %s - %s" % (self.user, self.goal, self.goal_amount)
 
-    
+
 # class FundManager(models.Model):
 #     type = models.CharField(max_length=200, default="fundmanager", null=True)
 #     country = models.CharField(max_length=200, blank=True, null=True)
@@ -476,8 +506,12 @@ class Goal(models.Model):
 class InvestmentClass(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True)
     code = models.CharField(max_length=255, null=True, blank=True)
+    description = models.CharField(max_length=200, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
-    
+    logo = models.ImageField(
+        upload_to="investmentClasses", default="default_picture.jpg"
+    )
+
     def __str__(self):
         return "%s" % self.name
 
@@ -490,9 +524,9 @@ class InvestmentOption(models.Model):
     interest = models.IntegerField(default=0)
     status = models.BooleanField(default=0)
     units = models.FloatField(default=0)
-    fund = models.CharField(max_length=200, null=True, blank=True)
+    description = models.CharField(max_length=200, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
         return "%s" % self.name
 
@@ -502,13 +536,14 @@ class InvestmentPerformance(models.Model):
     fund_manager = models.ForeignKey(User, on_delete=models.CASCADE)
     bought = models.BigIntegerField(default=0)
     selling = models.BigIntegerField(default=0)
-    performance_value = models.IntegerField(default=0)
+    performance_fee = models.IntegerField(default=0)
     units = models.FloatField(default=0)
     status = models.BooleanField(default=False)
+    management_fee = models.IntegerField(default=0)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return "%s %d" % self.class_id % self.performance_value
+        return "%s %s" % (self.fund_manager, self.investment_option)
 
 
 class FundWithdraw(models.Model):
@@ -540,9 +575,8 @@ class Deposit(models.Model):
     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     reference = models.CharField(max_length=200, default="")
-    reference_id = models.IntegerField(default=0)
-    txRef = models.CharField(max_length=200)
-    networth = models.FloatField(default=0)
+    reference_id = models.IntegerField(default=0, null=True)
+    txRef = models.CharField(max_length=200, null=True)
     available = models.BooleanField(default=0)
     updated = models.DateTimeField(null=True, blank=True)
     units = models.FloatField(default=0)
@@ -551,6 +585,61 @@ class Deposit(models.Model):
         return "%s - %s" % (self.user, self.deposit_amount)
 
 
+# temporarily change auto timedate
+class InvestmentTrack(models.Model):
+    # goals are also part of the risk profile
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    investment_option = models.ForeignKey(InvestmentOption, on_delete=models.CASCADE, null=True, blank=True)
+    withdraw_amount = models.FloatField(default=0)
+    deposit_amount = models.FloatField(default=0)
+    opening_balance = models.FloatField(default=0)
+    interest = models.FloatField(default=0)
+    management_fee = models.FloatField(default=0)
+    performance_fee = models.FloatField(default=0)
+    closing_balance = models.FloatField(default=0)
+    risk_profile = models.BooleanField(default=False)
+    out_performance = models.FloatField(default=0)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return "%s - %s" % (self.user, self.closing_balance)
+    
+
+class Transaction(models.Model):
+    # goals are also part of the risk profile
+    status = models.CharField(max_length=200, null=True)
+    message = models.CharField(max_length=200, null=True)
+    customer_reference = models.CharField(max_length=200, null=True)
+    internal_reference = models.CharField(max_length=200, null=True)
+    msisdn = models.CharField(max_length=200, null=True)
+    amount = models.FloatField(default=0)
+    currency = models.CharField(max_length=200, null=True)
+    provider = models.CharField(max_length=200, null=True)
+    charge = models.FloatField(default=0)
+    created = models.DateTimeField(auto_now_add=True)
+    processed = models.BooleanField(default=False)
+
+    def __str__(self):
+        return "%s - %s" % (self.msisdn, self.amount)
+
+
+# class Withdraw(models.Model):
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     withdraw_channel = models.CharField(max_length=200, default="bank")
+#     withdraw_amount = models.FloatField(default=0)
+#     currency = models.CharField(max_length=200, default="UGX")
+#     account_type = models.ForeignKey(AccountType, on_delete=models.DO_NOTHING)
+#     created = models.DateTimeField(auto_now_add=True)
+#     goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
+#     investment_option = models.ForeignKey(InvestmentOption, on_delete=models.CASCADE, null=True, blank=True)
+#     transaction = models.ForeignKey(BankTransaction, on_delete=models.CASCADE, null=True, blank=True)
+#     status = models.CharField(max_length=200, default="")
+#     units = models.FloatField(default=0)
+
+#     def __str__(self):
+#         return "%s - %s" % (self.user, self.withdraw_amount)
+
+# edited without transfer initiation
 class Withdraw(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     withdraw_channel = models.CharField(max_length=200, default="bank")
@@ -563,6 +652,9 @@ class Withdraw(models.Model):
     transaction = models.ForeignKey(BankTransaction, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=200, default="")
     units = models.FloatField(default=0)
+    account_number = models.CharField(max_length=255, null=True, blank=True)
+    account_bank = models.CharField(max_length=255, null=True, blank=True)
+    charge_amount = models.FloatField(default=0)
 
     def __str__(self):
         return "%s - %s" % (self.user, self.withdraw_amount)
@@ -606,9 +698,9 @@ class HealthCheck(models.Model):
 
 
 class Networth(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    deposit = models.ForeignKey(Deposit, on_delete=models.CASCADE, null=True, blank=True)
     amount = models.FloatField(default=0)
-    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -672,3 +764,176 @@ class TopUp(models.Model):
 
     def __str__(self):
         return "%s" % self.topup_amount
+
+
+# Group model for group texting
+class Group(models.Model):
+    name = models.CharField(max_length=255)  # Group name
+    description = models.TextField(blank=True, null=True)  # Optional group description
+    profile_pic = models.ImageField(upload_to='group_pics/', blank=True, null=True)  # Group profile picture
+    created_at = models.DateTimeField(auto_now_add=True)  # Group creation time
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_groups')  # Group creator
+    last_activity = models.DateTimeField(auto_now=True)  # Last activity timestamp
+
+    def __str__(self):
+        return self.name
+
+
+class GroupDeposit(models.Model):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='deposits')  # Link to the Group model
+    member = models.ForeignKey(User, on_delete=models.CASCADE, related_name='group_deposits')  # Link to the User model
+    deposit_amount = models.DecimalField(max_digits=15, decimal_places=2)  # Amount deposited
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE, default=1)  # Link to Currency model, default to ID 1 (e.g., UGX)
+    deposit_date = models.DateTimeField()  # Date and time of the deposit
+    status = models.CharField(max_length=20, default='pending', choices=[
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ])  # Status of the deposit
+    reference = models.CharField(max_length=100, unique=True, blank=True, null=True)  # Unique transaction reference
+    created_at = models.DateTimeField(auto_now_add=True)  # When the deposit record was created
+    updated_at = models.DateTimeField(auto_now=True)  # When the deposit record was last updated
+
+    def __str__(self):
+        return f"{self.member.username} - {self.group.name} - {self.deposit_amount} {self.currency.currency_code}"
+
+
+# New GroupGoal model
+class GroupGoal(models.Model):
+    group = models.ForeignKey('Group', on_delete=models.CASCADE, related_name='goals')
+    goal_name = models.CharField(max_length=255)
+    target_amount = models.DecimalField(max_digits=15, decimal_places=2)
+    current_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='active', choices=[
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ])
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.group.name} - {self.goal_name} - {self.target_amount}"
+    class Meta:
+        verbose_name = "Group Goal"
+        verbose_name_plural = "Group Goals"
+        ordering = ['-start_date']
+
+
+# Participant model to track group members
+class Participant(models.Model):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='participants')  # Group the participant belongs to
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='group_participations')  # User in the group
+    role = models.CharField(max_length=50, default='member')  # Role in the group (e.g., admin, member)
+    joined_at = models.DateTimeField(auto_now_add=True)  # When the user joined the group
+    muted = models.BooleanField(default=False)  # Whether the user has muted the group
+
+    class Meta:
+        unique_together = ('group', 'user')  # Ensure a user can only join a group once
+
+    def __str__(self):
+        return f'{self.user.username} in {self.group.name}'
+
+
+class GroupGoalDeposit(models.Model):
+    group = models.ForeignKey('Group', on_delete=models.CASCADE, related_name='goal_deposits')
+    goal = models.ForeignKey(GroupGoal, on_delete=models.CASCADE, related_name='deposits')
+    member = models.ForeignKey(User, on_delete=models.CASCADE, related_name='group_goal_deposits')
+    deposit_amount = models.DecimalField(max_digits=15, decimal_places=2)
+    currency = models.ForeignKey('Currency', on_delete=models.CASCADE, default=1)
+    deposit_date = models.DateTimeField()
+    status = models.CharField(max_length=20, default='pending', choices=[
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ])
+    reference = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.member.username} - {self.goal.goal_name} - {self.deposit_amount} {self.currency.currency_code}"
+
+    class Meta:
+        verbose_name = "Group Goal Deposit"
+        verbose_name_plural = "Group Goal Deposits"
+        ordering = ['-deposit_date']
+# Media model for handling attachments (images, audio, etc.)
+
+
+class GroupInvitation(models.Model):
+    group = models.ForeignKey('Group', on_delete=models.CASCADE, related_name='invitations')
+    token = models.CharField(max_length=64, unique=True, editable=False)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='group_invites')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()  # When the link stops working
+    max_uses = models.PositiveIntegerField(default=1)  # 0 = unlimited uses
+    uses = models.PositiveIntegerField(default=0)  # How many times it's been used
+    is_active = models.BooleanField(default=True)  # Can be manually disabled
+
+    class Meta:
+        verbose_name = "Group Invitation"
+        verbose_name_plural = "Group Invitations"
+        indexes = [
+            models.Index(fields=['token']),  # Faster lookups for token-based access
+        ]
+
+    def __str__(self):
+        return f"Invite for {self.group.name} (Expires: {self.expires_at})"
+
+    def save(self, *args, **kwargs):
+        if not self.token:  # Auto-generate token if new
+            self.token = secrets.token_urlsafe(32)  # Cryptographically secure
+        if not self.expires_at:  # Default expiry: 7 days
+            self.expires_at = date.now() + date.timedelta(days=7)
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        """Check if the invite can still be used."""
+        return (
+            self.is_active and
+            (self.max_uses == 0 or self.uses < self.max_uses) and
+            date.now() < self.expires_at
+        )
+
+    def mark_used(self):
+        """Increment usage count and deactivate if max uses reached."""
+        self.uses += 1
+        if self.max_uses > 0 and self.uses >= self.max_uses:
+            self.is_active = False
+        self.save()
+
+
+class Media(models.Model):
+    file_path = models.FileField(upload_to='media/')  # Path to the media file
+    type = models.CharField(max_length=50)  # Type of media (e.g., image, audio, video)
+    mime_type = models.CharField(max_length=100, blank=True, null=True)  # MIME type of the file
+    file_size = models.IntegerField(blank=True, null=True)  # Size of the file in bytes
+    duration = models.IntegerField(blank=True, null=True)  # Duration for audio/video files
+    thumbnail_path = models.FileField(upload_to='thumbnails/', blank=True, null=True)  # Thumbnail for media
+    created_at = models.DateTimeField(auto_now_add=True)  # When the media was uploaded
+    deleted = models.BooleanField(default=False)  # Soft delete flag
+
+    def __str__(self):
+        return f'{self.type} - {self.file_path}'
+
+
+# Message model for group texting
+# class Message(models.Model):
+#     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='messages')  # Group the message belongs to
+#     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')  # User who sent the message
+#     message = models.TextField(blank=True, null=True)  # Text content of the message
+#     media = models.ForeignKey(Media, on_delete=models.SET_NULL, blank=True, null=True)  # Attached media (if any)
+#     type = models.CharField(max_length=50, default='text')  # Type of message (e.g., text, image, audio)
+#     status = models.CharField(max_length=50, default='sent')  # Status of the message (e.g., sent, delivered, read)
+#     timestamp = models.DateTimeField(auto_now_add=True)  # When the message was sent
+#     reply_to = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='replies')  # Reply to another message
+#     reply_to_message = models.TextField(blank=True, null=True)  # Text of the replied message
+#     forwarded = models.BooleanField(default=False)  # Whether the message was forwarded
+#     edited = models.BooleanField(default=False)  # Whether the message was edited
+#     deleted = models.BooleanField(default=False)  # Soft delete flag
+
+#     def __str__(self):
+#         return f'{self.sender.username}: {self.message}'

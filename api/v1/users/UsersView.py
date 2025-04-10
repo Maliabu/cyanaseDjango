@@ -1,21 +1,16 @@
 
 
-from django.shortcuts import render
 # Create your views here.
 from .Users import Users
-from django.urls import reverse,resolve
-from django.shortcuts import render, HttpResponse
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
-from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from api.helper.helper import Helper
 import json
-from django.db.models import Q
 
 DEFAULT_LANG = "en"
 
@@ -30,7 +25,7 @@ class GetAuthUser(APIView):
     http_method_names = ['get']
 
     def get(self, request, lang, format=None):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         user = _user.getAuthUser(request, lang)
         return Response(user)
 
@@ -43,6 +38,17 @@ class GetAllUsers(APIView):
     def get(self, request, lang, format=None):
         lang = DEFAULT_LANG if lang is None else lang
         user = _user.getAllUsers(request, lang)
+        return Response(user)
+
+
+class GetAllFundManagers(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang, format=None):
+        lang = DEFAULT_LANG if lang is None else lang
+        user = _user.getAllFundManagers(request, lang)
         return Response(user)
 
 
@@ -68,7 +74,7 @@ class GetAuthUserById(APIView):
                 'message': "Incomplete data request",
                 'success': False
             })
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         user = _user.getAuthUserById(request, lang, userid)
         return Response(user)
 
@@ -97,8 +103,8 @@ class GetAuthUserByEmail(ObtainAuthToken):
                 'message': "Incomplete data request",
                 'success': False
             })
-        lang = DEFAULT_LANG if lang == None else lang
-        user = _user.emailExists(request,lang,email)
+        lang = DEFAULT_LANG if lang is None else lang
+        user = _user.emailExists(request, lang, email)
         if user:
             return Response(True)
         else:
@@ -115,6 +121,7 @@ class IsUserVerified(ObtainAuthToken):
             })
         lang = DEFAULT_LANG if lang is None else lang
         is_verified = _user.emailIsVerified(request, lang, email)
+        print(is_verified)
         if is_verified is True:
             return Response({
                 "message": "User is verified",
@@ -123,6 +130,28 @@ class IsUserVerified(ObtainAuthToken):
         else:
             return Response({
                 "message": "User is not verified",
+                "success": False
+            })
+            
+            
+class IsUserStaff(ObtainAuthToken):
+    def post(self, request, lang):
+        email = request.data
+        if not str(email):
+            return Response({
+                'message': "Incomplete data request",
+                'success': False
+            })
+        lang = DEFAULT_LANG if lang is None else lang
+        is_verified = _user.IsEmailStaff(request, lang, email)
+        if is_verified is True:
+            return Response({
+                "message": "Staff is verified",
+                "success": True
+            })
+        else:
+            return Response({
+                "message": "Staff is not verified",
                 "success": False
             })
 
@@ -149,9 +178,53 @@ class ResendVerificationEmail(ObtainAuthToken):
             })
 
 
+class SendSimpleEmail(ObtainAuthToken):
+    def post(self, request, lang):
+        email = request.data
+        if not str(email):
+            return Response({
+                'message': "Incomplete data request",
+                'success': False
+            })
+        lang = DEFAULT_LANG if lang is None else lang
+        email_sent = _user.SendSimpleEmail(request, lang, email)
+        if email_sent["success"] is True:
+            return Response({
+                "message": "verification email sent",
+                "success": True
+            })
+        else:
+            return Response({
+                "message": "verification email not sent",
+                "success": False
+            })
+
+
+class SimpleEmail(ObtainAuthToken):
+    def post(self, request, lang):
+        email = request.data
+        if not str(email):
+            return Response({
+                'message': "Incomplete data request",
+                'success': False
+            })
+        lang = DEFAULT_LANG if lang is None else lang
+        email_sent = _user.SimpleEmail(request, lang, email)
+        if email_sent["success"] is True:
+            return Response({
+                "message": "invest email sent",
+                "success": True
+            })
+        else:
+            return Response({
+                "message": "invest email not sent",
+                "success": False
+            })
+
+
 class CreateUserAuthToken(ObtainAuthToken):
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         serializer = self.serializer_class(data=request.data,
                                            context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -186,7 +259,6 @@ class LoginUserAuthToken(ObtainAuthToken):
                 })
             else:
                 unilogin = _user.DirectLoginUser(request, lang, username)
-                ########
                 if not unilogin["success"]:
                     return Response(unilogin)
                 else:
@@ -194,14 +266,17 @@ class LoginUserAuthToken(ObtainAuthToken):
                     user = authenticate(username=username, password=password)
                     if user:
                         token, created = Token.objects.get_or_create(user=user)
+                        # update user last_login
+                        userid = user.pk
+                        _user.UpdateLastLogin(request, lang, userid)
                         return Response(
                             {
-                            'token': token.key,
-                            'user_id': user.pk,
-                            "user": unilogin,
-                            'message': "You are logged in",
-                            'success': True
-                        })
+                                'token': token.key,
+                                'user_id': user.pk,
+                                "user": unilogin,
+                                'message': "You are logged in",
+                                'success': True
+                            })
                     else:
                         return Response({
                             'message': "Invalid login credentials",
@@ -209,25 +284,63 @@ class LoginUserAuthToken(ObtainAuthToken):
                         })
 
         else:
-            return Response({"message": "Invalid request method", "status": "failed"}, status=400)
+            return Response({
+                "message": "Invalid request method", "status": "failed"
+                }, status=400)
 
 
-# Generate custom AUTH Token
-class CreateUserAuthToken(ObtainAuthToken):
-    def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
-        serializer = self.serializer_class(data=request.data,
-                                           context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-        token, created = Token.objects.get_or_create(user=user)
-        return Response({
-            'token': token.key,
-            'user_id': user.pk,
-            'email': user.email
-        })
+# Login User
+class AppLoginUserAuthToken(ObtainAuthToken):
+    def post(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
+        data = request.data
+        if data:
+            username = data["username"]
+            password = data["password"]
+            # print(username)
+            # print(password)
+            if not username:
+                return Response({
+                    'message': "Username is required",
+                    'success': False
+                })
+            elif not password:
+                return Response({
+                    'message': "Password is required",
+                    'success': False
+                })
+            else:
+                unilogin = _user.AppDirectLoginUser(request, lang, username)
+                if not unilogin["success"]:
+                    return Response(unilogin)
+                else:
+                    return Response(
+                        {
+                            'token': unilogin['token'],
+                            'user_id': unilogin['user_id'],
+                            "user": unilogin,
+                            'message': "You are logged in",
+                            'success': True
+                        })
 
-# Create Auth User
+        else:
+            return Response({
+                "message": "Invalid request method", "status": "failed"
+                }, status=400)
+
+
+class LogoutUser(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get']
+
+    def get(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
+        logout = _user.UpdateLogout(request, lang)
+        if logout is True:
+            return Response({"message": "Logged out", "success": True})
+        else:
+            return Response({"message": "Still logged in", "success": False})
 
 
 class CreateAuthUser(ObtainAuthToken):
@@ -236,7 +349,7 @@ class CreateAuthUser(ObtainAuthToken):
     http_method_names = ['post']
 
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         first_name = request.data["first_name"]
         email = request.data["email"]
         if email:
@@ -284,7 +397,8 @@ class CreateAuthUser(ObtainAuthToken):
             })
         elif _user.emailExists(request, lang, email):
             return Response({
-                'message': f"Account with email address {email} already exists",
+                'message': 
+                f"Account with email address {email} already exists",
                 "type": "email",
                 'success': False
             })
@@ -314,7 +428,8 @@ class CreateAuthUser(ObtainAuthToken):
             })
         elif password and len(password) < 6:
             return Response({
-                'message': "Password is too short, must atleast 6 characters or above",
+                'message': 
+                "Password is too short, must atleast 6 characters or above",
                 "type": "password",
                 'success': False
             })
@@ -406,7 +521,8 @@ class CreateApiUser(ObtainAuthToken):
             })
         elif _user.emailExists(request, lang, email):
             return Response({
-                'message': f"Account with email address {email} already exists",
+                'message': 
+                f"Account with email address {email} already exists",
                 "type": "email",
                 'success': False
             })
@@ -436,7 +552,8 @@ class CreateApiUser(ObtainAuthToken):
             })
         elif password and len(password) < 6:
             return Response({
-                'message': "Password is too short, must atleast 6 characters or above",
+                'message': 
+                "Password is too short, must atleast 6 characters or above",
                 "type": "password",
                 'success': False
             })
@@ -499,7 +616,9 @@ class UpdateAuthUserPassword(APIView):
         user = _user.getAuthUser(request, lang)
         userid = user["user_id"]
         if not str(userid):
-            return Response({"message": "Incomplete data request", "success": False})
+            return Response({
+                "message": "Incomplete data request", "success": False
+                })
         if not password:
             return Response({
                 'message': "Password is required",
@@ -512,7 +631,8 @@ class UpdateAuthUserPassword(APIView):
             })
         elif len(password) < 6:
             return Response({
-                'message': "Password is too short, must atleast 6 characters or above",
+                'message': 
+                "Password is too short, must atleast 6 characters or above",
                 'success': False
             })
         elif not confirmpassword:
@@ -526,8 +646,11 @@ class UpdateAuthUserPassword(APIView):
                 'success': False
             })
         else:
-            user = _user.UpdateAuthUserPassword(request, lang, password, userid)
-            return Response({"message": "Password updated successfuly", "success": True}, status=200)
+            user = _user.UpdateAuthUserPassword(
+                request, lang, password, userid)
+            return Response({
+                "message": "Password updated successfuly", 
+                "success": True}, status=200)
 
 
 class DeleteUserAccount(APIView):
@@ -538,7 +661,9 @@ class DeleteUserAccount(APIView):
     def get(self, request, lang):
         user = _user.DeleteAccount(request, lang)
         if user:
-            return Response({"message": "Account deleted successfuly", "success": True}, status=200)
+            return Response({
+                "message": 
+                "Account deleted successfuly", "success": True}, status=200)
 
 
 class UpdateAuthUser(APIView):
@@ -548,26 +673,31 @@ class UpdateAuthUser(APIView):
     # Request
 
     def get(self, request, lang, userid):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         return Response({
             'message': "Username already exists, please choose another name",
             'success': False
         }
-        # , status = 400 alters the response format
         )
 
     def post(self, request, lang, userid):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         if not userid:
-            return Response({"message": "Incomplete data request", "success": False})
+            return Response({
+                "message": "Incomplete data request", "success": False})
 
         request_object = request.body.decode("utf-8")
         if request_object:
             data = json.loads(request_object)
             if len(data) > 0:
                 if "username" in data or "email" in data or "is_superuser" in data or "security_group_id" in data or "first_name" in data or "last_name" in data or "profile_id" in data or "gender" in data or "phoneno" in data or "title" in data or "id_number" in data or "bio" in data or "location" in data or "location" in data or "birth_date" in data or "profile_picture" in data or "usignature" in data or "is_staff" in data or "is_active" in data:
-                    if not data["username"] and not data["email"] and not str(data["is_superuser"]) and not str(data["security_group_id"]) and not data["first_name"] and not data["last_name"] and not str(data["profile_id"]) and not data["gender"] and not str(data["phoneno"]) and not data["title"] and not data["id_number"] and not data["bio"] and not data["location"] and not data["location"] and not str(data["birth_date"]) and not data["profile_picture"] and not data["usignature"] and not str(data["is_staff"]) and not str(data["is_active"]):
-                        return Response({"message": "Can't update when all fields are missing", "success": False})
+                    if not data["username"] and not data["email"] and not str(
+                        data["is_superuser"]) and not str(
+                            data["security_group_id"]) and not data["first_name"] and not data["last_name"] and not str(data["profile_id"]) and not data["gender"] and not str(data["phoneno"]) and not data["title"] and not data["id_number"] and not data["bio"] and not data["location"] and not data["location"] and not str(data["birth_date"]) and not data["profile_picture"] and not data["usignature"] and not str(data["is_staff"]) and not str(data["is_active"]):
+                        return Response({
+                            "message": 
+                            "Can't update when all fields are missing", 
+                            "success": False})
                     else:
                         email = data["email"]
                         if email and not _helper.isEmailValid(email):
@@ -581,19 +711,25 @@ class UpdateAuthUser(APIView):
                                 'success': False
                             })
                         else:
-                            results = _user.UpdateAuthUser(
+                            _user.UpdateAuthUser(
                                 request, lang, userid, data)
-                            return Response({"message": "User updated successfuly", "success": True}, status=200)
+                            return Response({
+                                "message": "User updated successfuly", 
+                                "success": True}, status=200)
             else:
-                return Response({"message": "Incomplete data request", "success": False}, status=400)
+                return Response({
+                    "message": "Incomplete data request",
+                    "success": False}, status=400)
         else:
-            return Response({"message": "Incomplete data request", "success": False}, status=400)
+            return Response({
+                "message": "Incomplete data request",
+                "success": False}, status=400)
 # Generate custom AUTH Token
 
 
 class ResendVerificationCode(ObtainAuthToken):
     def get(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         if not ("email" in request.GET):
             return Response({
                 'message': "Incomplete data request",
@@ -618,35 +754,85 @@ class ResendVerificationCode(ObtainAuthToken):
                 return Response(response, status=400)
 
 
-# Create Auth User
 class verifyAccount(ObtainAuthToken):
     http_method_names = ['get']
 
     def get(self, request, lang, userid):
+        print(request.GET["code"])
         if not str(userid):
-            return Response({"message": "Incomplete data request", "success": False}, status=400)
+            return Response({
+                "message": "Incomplete data request",
+                "success": False}, status=400)
         if not ("code" in request.GET):
             return Response({
                 'message': "Incomplete data request",
                 'success': False
             }, status=400)
         elif not str(request.GET["code"]):
-            return Response({"message": "Verification token is required", "success": False}, status=400)
+            return Response({
+                "message": "Verification token is required",
+                "success": False}, status=400)
         elif _user.isAccounVerifiedByID(request, lang, userid):
-            return Response({"message": "Account already verified", "success": True}, status=200)
+            return Response({
+                "message": "Account already verified",
+                "success": True}, status=200)
         elif not _user.isVerificationTokenValid(request, lang, userid, request.GET["code"]):
-            return Response({"message": "Invalid verification code, either your code already expired or it is invalid, please resend verifiction code", "success": False}, status=400)
+            return Response({
+                "message":
+                "Invalid verification code, either your code already expired or it is invalid, please resend verifiction code",
+                "success": False}, status=400)
         else:
             _user.VerifyAccount(request, lang, userid, request.GET["code"])
             _user.updateUserVerificationToken(request, lang, userid)
-            return Response({"message": "Account verified successfuly", "success": True}, status=200)
+            return Response({
+                "message": "Account verified successfuly",
+                "success": True}, status=200)
+
+
+class VerifyCode(ObtainAuthToken):
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        username = request.data.get('username')
+        code = request.data.get('code')
+
+        # Validate input fields
+        if not username or not code:
+            return Response({
+                "message": "Email and verification code are required",
+                "success": False})
+
+        # Call the second function to process the verification
+        _user.verify_user_account(request, lang, username, code)
+        return Response({
+            "message": 'code verified successfully',
+            "success": True
+        })
+
+
+class setPassCode(ObtainAuthToken):
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        email = request.data.get('email')
+        code = request.data.get('code')
+
+        # Validate input fields
+        if not email or not code:
+            return Response({
+                "message": "passcode is required",
+                "success": False})
+
+        # Call the second function to process the verification
+        response = _user.set_passcode(request, lang, email, code)
+        return Response(response)
 
 
 class InitPasswordReset(ObtainAuthToken):
     http_method_names = ['post']
-    
+
     def post(self, request, lang, *args, **kwargs):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         email = request.data["email"]
         if not email:
             return Response({
@@ -656,10 +842,30 @@ class InitPasswordReset(ObtainAuthToken):
         else:
             response = _user.InitPasswordReset(
                 request, lang, email)
-            if response["success"]==True:
-                return Response(response)
-            else:
-                return Response(response)
+            return Response(response)
+
+
+class AppPasswordReset(ObtainAuthToken):
+    http_method_names = ['post']
+
+    def post(self, request, lang, *args, **kwargs):
+        lang = DEFAULT_LANG if lang is None else lang
+        email = request.data["email"]
+        verificationcode = request.data["code"]
+        if not email:
+            return Response({
+                'message': "email required",
+                'success': False
+            })
+        elif not verificationcode:
+            return Response({
+                'message': "verification code is required",
+                'success': False
+            })
+        else:
+            response = _user.AppPasswordReset(
+                request, lang, email, verificationcode)
+            return Response(response)
 
 # Generate custom AUTH Token
 # class InitPasswordReset(ObtainAuthToken):
@@ -697,9 +903,11 @@ class InitPasswordReset(ObtainAuthToken):
 # Login User
 class NewPasswordReset(ObtainAuthToken):
     def post(self, request, lang, userid):
-        lang = DEFAULT_LANG if lang == None else lang
+        lang = DEFAULT_LANG if lang is None else lang
         if not str(userid):
-            return Response({"message": "Incomplete data request", "success": False})
+            return Response({
+                "message": "Incomplete data request",
+                "success": False})
         #############################################
         data = request.data
         if data:
@@ -782,11 +990,81 @@ class OnboardAuthUsers(ObtainAuthToken):
                         'success': False
                     })
                 else:
-                    print(user)
-                    _user.onboardUsers(request, lang,user)
+                    _user.onboardUsers(request, lang, user)
             number = len(users)
             return Response({
                 "users": number,
-                "message":"These users are now on board",
-                "success":True
+                "message": "These users are now on board",
+                "success": True
             })
+
+
+class OnboardOrtusUsers(ObtainAuthToken):
+    # need OTP created
+    # need OTP emailed
+    authentication_classes = ()
+    permission_classes = ()
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        # dict array
+        users = request.data
+        if len(users) <= 0:
+            return Response({
+                "message": "No users in this databse",
+                "success": False
+            })
+        else:
+            for user in users:
+                if not user["email"] or not user["first_name"] or not user["last_name"] or not user["gender"] or not user["phone_no"] or not user["birth_date"]:
+                    return Response({
+                        'message': "Something is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                elif not user["gender"]:
+                    return Response({
+                        'message': "gender is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                elif not user["phone_no"]:
+                    return Response({
+                        'message': "phone is missing",
+                        "type": "required",
+                        'success': False
+                    })
+                else:
+                    _user.onboardOrtusUsers(request, lang, user)
+            number = len(users)
+            return Response({
+                "users": number,
+                "message": "These users are now on board",
+                "success": True
+            })
+
+
+class CheckEmailPhone(APIView):
+    authentication_classes = ()
+    permission_classes = ()
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        lang = DEFAULT_LANG if lang is None else lang
+        phoneno = request.data["phone"]
+        email = request.data["email"]
+
+        if not phoneno:
+            return Response({
+                "message": "phone number is required",
+                "success": False
+            })
+        elif not email:
+            return Response({
+                "message": "email is required",
+                "success": False
+            })
+        else:
+            # checkDetails = _user.CheckEmailPhone(request, lang, email, phoneno)
+            checkDetails = _user.CheckMUser(request, lang)
+            return Response(checkDetails)

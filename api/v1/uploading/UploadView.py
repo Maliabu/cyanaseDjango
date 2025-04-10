@@ -1,4 +1,3 @@
-from django.shortcuts import render
 # Create your views here.
 from .Upload import Upload
 from django.shortcuts import render, HttpResponse
@@ -7,14 +6,10 @@ from rest_framework.authentication import SessionAuthentication, BasicAuthentica
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.authtoken.models import Token
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate
 from api.helper.helper import Helper
-from django.db.models import Q
 from api.config import webconfig
 from ..users.Users import Users
+from api.views import Goals
 import os
 # from PIL import Image
 ###############33
@@ -24,6 +19,7 @@ DEFAULT_LANG = "en"
 _upload = Upload()
 _helper = Helper()
 _user = Users()
+_goal = Goals()
 
 
 class uploadVideo(APIView):
@@ -179,7 +175,10 @@ class uploadVideoThumbnail(APIView):
                 valid_ext = valid_ext[:-2]
                 return JsonResponse({"message": f"Invalid image extension, We only support {valid_ext}", "status": "failed"}, status=400)
         else:
-            return JsonResponse({"message": "Incomplete request data", "status": "failed"}, status=400)
+            return JsonResponse({
+                "message": "Incomplete request data",
+                "status": "failed"
+                }, status=400)
 
     def upload(self, output, file):
         destination = open(output, 'wb+')
@@ -203,7 +202,7 @@ class UploadPhoto(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang):
         photo = request.data['photo']
         userid = request.user.id
@@ -213,14 +212,37 @@ class UploadPhoto(APIView):
             _user.UpdateProfilePhoto(request, lang, userid, photo)
             return Response({"message": "Upload successful", "success": True})
         else:
-            return Response({"message": "Incomplete request data", "success": False})
+            return Response({
+                "message": "Incomplete request data",
+                "success": False
+                })
+
+
+class UploadGoalPhoto(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+
+    def post(self, request, lang):
+        photo = request.data['photo']
+        goalid = request.data['goal_id']
+        if photo:
+            # destination = 'media/profile/'
+            # _upload.upload(destination,photo)
+            _goal.UpdateGoalPhoto(goalid, photo)
+            return Response({"message": "Upload successful", "success": True})
+        else:
+            return Response({
+                "message": "Incomplete request data",
+                "success": False
+                })
 
 
 class UploadFile(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
-    
+
     def post(self, request, lang):
         moa = request.data['moa']
         userid = request.user.id
@@ -230,4 +252,8 @@ class UploadFile(APIView):
             _user.UpdateProfilePhoto(request, lang, userid, moa)
             return Response({"message": "Upload successful", "success": True})
         else:
-            return Response({"message": "Incomplete request data", "success": False})
+            return Response(
+                {
+                    "message": "Incomplete request data",
+                    "success": False
+                })

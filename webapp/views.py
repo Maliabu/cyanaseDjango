@@ -1,24 +1,25 @@
-
-from rest_framework.response import Response
 from api.v1.users.Users import Users
 from rest_framework.decorators import api_view, renderer_classes
 from rest_framework.renderers import TemplateHTMLRenderer
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 import json
 from api.config import webconfig
-# from django.utils.encoding import force_bytes, force_str, force_text, DjangoUnicodeDecodeError
 from django.shortcuts import render, redirect, HttpResponse
 from django.http import HttpResponseRedirect
+from rest_framework.response import Response
 from django.urls import reverse
 from django.contrib import messages
 from api.helper.Cryptor import Cryptor
 from urllib.parse import unquote_plus
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import AllowAny
 
 
 # from .utils import generate_token
 # from .models import User
-## users
+# users
 _cryptor = Cryptor()
 DEFAULT_LANG = "en"
 _user = Users()
@@ -98,7 +99,6 @@ def VerifyAccount(request):
 
 @csrf_exempt
 def ResetPassword(request):
-    print(request.GET)
     lang = "en"
     if not ("email" in request.GET) or not ("password" in request.GET) or not ("ref" in request.GET):
         print("NO DATA IN POST")
@@ -110,16 +110,46 @@ def ResetPassword(request):
     else:
         email = request.GET["email"]
         password = request.GET["password"]
-        print(email,password)
+        print(email, password)
         user = _user.getAuthUserByEmailReset(request, lang, email)
         userid = user["user_id"]
-        update = _user.UpdateAuthUserPassword(request,lang,password,userid)
+        update = _user.UpdateAuthUserPassword(request, lang, password, userid)
         if update:
             return render(
                 request,
                 "password-reset.html",
                 {"message": "Your account password has been reset successfully", "success": True},
             )
+
+
+@api_view(['POST'])
+@authentication_classes([])  # This disables authentication for this view
+@permission_classes([AllowAny])
+@csrf_exempt
+def AppResetPassword(request):
+    lang = "en"
+    if request.method == 'POST':
+        body = json.loads(request.body.decode('utf-8'))
+        email = body.get('email')
+        password = body.get('password')
+        user = _user.getAuthUserByEmailReset(request, lang, email)
+        userid = user["user_id"]
+        update = _user.UpdateAuthUserPassword(request, lang, password, userid)
+        if update:
+            return Response({
+                "message": "Your account password has been reset successfully",
+                "success": True
+            })
+        else:
+            return Response({
+                "message": "Your account password was not reset",
+                "success": False
+            })
+    else:
+        return Response({
+            "message": "Your account password was not reset",
+            "success": False
+        })
 
 # def activate_user(request, uidb64, token):
 
@@ -139,4 +169,5 @@ def ResetPassword(request):
 #                              'Email verified, you can now login')
 #         return redirect(reverse('login'))
 
-#     return render(request, 'authentication/activate-failed.html', {"user": user})
+#     return render(request,
+# 'authentication/activate-failed.html', {"user": user})

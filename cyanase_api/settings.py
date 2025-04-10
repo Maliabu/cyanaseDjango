@@ -106,12 +106,12 @@ EMAIL_PORT = 587
 EMAIL_HOST_USER = "support@cyanase.com"
 EMAIL_HOST_PASSWORD = "?)PbtO=~Og5F"
 
-# Flutterwave
+# Flutterwave =~
 # Api keys
-DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
-DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
-SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
-SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
+# DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
+# DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
+# SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
+# SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
 
 # DEPOSIT_PUB_KEY = "FLWPUBK-b248048d7e363a0497a7bf525c43d822-X"
 # DEPOSIT_SEC_KEY = "FLWSECK-5c09157bff6ad1b4dc72207be91f6efe-X"
@@ -184,16 +184,20 @@ CHANNEL_LAYERS = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME":
+        "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "NAME":
+        "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+        "NAME":
+        "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        "NAME":
+        "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -226,16 +230,22 @@ STATIC_ROOT = os.path.join(BASE_DIR, "assests")
 
 STATIC_ROOT_URL = os.path.join(BASE_DIR, "static")
 
+TEMPLATES_URL = "/templates/"
+
+TEMPLATES_ROOT = os.path.join(BASE_DIR, "templates")
+
 MEDIA_URL = "/media/"
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 CORS_ORIGIN_ALLOW_ALL = False
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:3000",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://localhost:53651"
 ]
 CORS_ORIGIN_WHITELIST = [
     "http://127.0.0.1:3000",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://localhost:53651"
 ]
 CSRF_COOKIE_SECURE = True
