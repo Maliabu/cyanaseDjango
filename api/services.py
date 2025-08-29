@@ -18,18 +18,11 @@ import os, hashlib, warnings, requests, json
 import base64
 from Crypto.Cipher import DES3
 
-# live
-DEPOSIT_SEC_KEY = "FLWSECK-5c09157bff6ad1b4dc72207be91f6efe-X"
-SUB_SEC_KEY = "FLWSECK-141bf374414b8733059148caa69def01-X"
-
-# sandbox
-# SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
-# DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
 
 BEARER_INVESTORS = DEPOSIT_SEC_KEY
 BEARER_SAVERS = SUB_SEC_KEY
 
-BEARER_RLX = "afb465fe38693d.5mCTE0W4MJvUHQS3tNzlww"
+
 
 _helper = Helper()
 
