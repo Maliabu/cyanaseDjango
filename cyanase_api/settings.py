@@ -106,17 +106,6 @@ EMAIL_PORT = 587
 EMAIL_HOST_USER = "support@cyanase.com"
 EMAIL_HOST_PASSWORD = "?)PbtO=~Og5F"
 
-# Flutterwave =~
-# Api keys
-# DEPOSIT_PUB_KEY = "FLWPUBK_TEST-955232eaa38c733225e42cee9597d1ca-X"
-# DEPOSIT_SEC_KEY = "FLWSECK_TEST-ce0f1efc8db1d85ca89adb75bbc1a3c8-X"
-# SUB_PUB_KEY = "FLWPUBK_TEST-99f83b787d32f5195dcf295dce44c3ab-X"
-# SUB_SEC_KEY = "FLWSECK_TEST-abba21c766a57acb5a818a414cd69736-X"
-
-# DEPOSIT_PUB_KEY = "FLWPUBK-b248048d7e363a0497a7bf525c43d822-X"
-# DEPOSIT_SEC_KEY = "FLWSECK-5c09157bff6ad1b4dc72207be91f6efe-X"
-# SUB_PUB_KEY = "FLWPUBK-2f0d88d10a57d95acfd495bb18b32d43-X"
-# SUB_SEC_KEY = "FLWSECK-141bf374414b8733059148caa69def01-X"
 
 # Verify
 VERIFY = "https://ravesandboxapi.flutterwave.com/flwv3-pug/getpaidx/api/v2/verify"
